@@ -486,11 +486,34 @@ async function loadLog() {
 }
 
 // ── COMMENTS ─────────────────────────────────────
+// track update type per task
+const updateTypes = {};
+
+function setUpdateType(taskId, type) {
+  updateTypes[taskId] = type;
+  const types = ['update','blocker','resolved','note'];
+  const styles = {
+    update:   {bg:'var(--c2l)',  border:'var(--c2)',  color:'var(--c2m)'},
+    blocker:  {bg:'var(--c4l)',  border:'var(--c4)',  color:'var(--c4m)'},
+    resolved: {bg:'var(--c1l)',  border:'var(--c1)',  color:'var(--c1m)'},
+    note:     {bg:'var(--c5l)',  border:'var(--c5)',  color:'var(--c5m)'},
+  };
+  types.forEach(t => {
+    const btn = document.getElementById(`utype-${t}-${taskId}`);
+    if (!btn) return;
+    const s = t === type ? styles[t] : {bg:'transparent', border:'var(--border)', color:'var(--muted)'};
+    btn.style.background = s.bg;
+    btn.style.borderColor = s.border;
+    btn.style.color = s.color;
+  });
+}
+
 async function toggleComments(taskId) {
   const el = document.getElementById(`comments-${taskId}`);
   if (!el) return;
   if (el.style.display === 'none') {
     el.style.display = 'block';
+    setUpdateType(taskId, 'update');
     await loadComments(taskId);
   } else {
     el.style.display = 'none';
@@ -499,39 +522,65 @@ async function toggleComments(taskId) {
 
 async function loadComments(taskId) {
   const { data } = await db.from('task_comments')
-    .select('*').eq('task_id', taskId).order('created_at');
+    .select('*').eq('task_id', taskId).order('created_at', {ascending:false});
   const list = data || [];
   const el = document.getElementById(`comment-list-${taskId}`);
   if (!el) return;
+  const typeIcon = {update:'📝', blocker:'⛔', resolved:'✅', note:'💬'};
+  const typeBg   = {update:'var(--c2l)', blocker:'var(--c4l)', resolved:'var(--c1l)', note:'var(--c5l)'};
+  const typeColor= {update:'var(--c2m)', blocker:'var(--c4m)', resolved:'var(--c1m)', note:'var(--c5m)'};
   el.innerHTML = list.length === 0
-    ? '<div style="font-size:12px;color:var(--muted);padding:4px 0">ຍັງບໍ່ມີ comment</div>'
+    ? '<div style="font-size:12px;color:var(--muted);padding:4px 0">ຍັງບໍ່ມີ update</div>'
     : list.map(c => {
         const initials = (c.user_email||'?').substring(0,2).toUpperCase();
         const dt = new Date(c.created_at).toLocaleString('lo-LA');
-        return `<div class="comment-item">
+        const ut = c.update_type||'note';
+        const icon = typeIcon[ut]||'💬';
+        const bg = typeBg[ut]||'var(--c5l)';
+        const col = typeColor[ut]||'var(--c5m)';
+        return `<div class="comment-item" style="border-left:3px solid ${col};padding-left:10px;border-radius:0">
           <div class="comment-header">
-            <div class="comment-avatar">${initials}</div>
+            <div class="comment-avatar" style="background:${bg};color:${col}">${initials}</div>
+            <span class="comment-meta" style="font-weight:600;color:${col}">${icon} ${{update:'ອັບເດດ',blocker:'ຕິດຂັດ',resolved:'ແກ້ໄຂໄດ້',note:'ໝາຍເຫດ'}[ut]||ut}</span>
             <span class="comment-meta">${c.user_email} · ${dt}</span>
           </div>
-          <div class="comment-body">${c.body}</div>
+          <div class="comment-body" style="margin-top:4px">${c.body}</div>
+          ${c.progress_snapshot!=null?`<div style="font-size:11px;color:var(--muted);margin-top:3px;padding-left:32px">Progress: ${c.progress_snapshot}% | Status: ${{inprogress:'ດຳເນີນ',blocked:'ຕິດຂັດ',done:'ສຳເລັດ'}[c.status_snapshot]||c.status_snapshot||'—'}</div>`:''}
         </div>`;
       }).join('');
 }
 
-async function addComment(taskId) {
-  const inp = document.getElementById(`comment-input-${taskId}`);
-  const body = inp?.value?.trim();
-  if (!body || !currentUser) return;
+async function submitUpdate(taskId) {
+  const body = document.getElementById(`comment-input-${taskId}`)?.value?.trim();
+  if (!body) { toast('⚠️ ຂຽນ update ກ່ອນ'); return; }
+  if (!currentUser) { toast('⚠️ ກະລຸນາ Login'); return; }
+
+  const updateType = updateTypes[taskId] || 'note';
+  const progress = parseInt(document.getElementById(`prog-${taskId}`)?.value || 0);
+  const status = document.getElementById(`stat-${taskId}`)?.value || 'inprogress';
+
+  // Save comment with metadata
   await db.from('task_comments').insert({
     task_id: taskId,
     user_id: currentUser.id,
     user_email: currentUser.email,
-    body
+    body,
+    update_type: updateType,
+    progress_snapshot: progress,
+    status_snapshot: status
   });
-  inp.value = '';
-  await loadComments(taskId);
+
+  // Update task progress + status
+  await db.from('tasks').update({ progress, status }).eq('id', taskId);
+
   const task = allTasks.find(t => t.id === taskId);
-  await logAction('commented','task', taskId, task?.name||'', body.substring(0,80));
+  await logAction('updated','task', taskId, task?.name||'',
+    `${updateType}: ${body.substring(0,60)} | progress:${progress}% status:${status}`);
+
+  document.getElementById(`comment-input-${taskId}`).value = '';
+  toast('✅ ບັນທຶກ update ສຳເລັດ!');
+  await loadComments(taskId);
+  await loadTasks();
 }
 
 // ── ADVANCED SEARCH helpers ───────────────────────
@@ -789,11 +838,62 @@ function renderTasks() {
           </div>
         </div>
       </div>
-      <div id="comments-${t.id}" style="display:none;padding:10px 12px 0 42px;border-top:1px solid var(--border);margin-top:4px">
-        <div id="comment-list-${t.id}"></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <input type="text" id="comment-input-${t.id}" placeholder="ຂຽນ comment..." style="flex:1;font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
-          <button onclick="addComment(${t.id})" style="border:1px solid var(--border);background:var(--text);color:var(--bg);border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;font-family:inherit">ສົ່ງ</button>
+      <div id="comments-${t.id}" style="display:none;border-top:1px solid var(--border);margin-top:8px;padding:12px 0 4px 0">
+        
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;padding:0 2px">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">ອັບເດດ Progress %</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="range" id="prog-${t.id}" min="0" max="100" step="5" value="${t.progress}"
+                oninput="document.getElementById('prog-val-${t.id}').textContent=this.value+'%'"
+                style="flex:1;accent-color:var(--c1)">
+              <span id="prog-val-${t.id}" style="font-size:12px;font-weight:600;min-width:32px;color:var(--c1)">${t.progress}%</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">ສະຖານະ</div>
+            <select id="stat-${t.id}" style="width:100%;font-size:12px;padding:4px 6px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+              <option value="inprogress" ${t.status==='inprogress'?'selected':''}>🔄 ດຳເນີນຢູ່</option>
+              <option value="blocked" ${t.status==='blocked'?'selected':''}>⛔ ຕິດຂັດ</option>
+              <option value="done" ${t.status==='done'?'selected':''}>✅ ສຳເລັດ</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:10px;padding:0 2px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">ປະເພດ update</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button onclick="setUpdateType(${t.id},'update')" id="utype-update-${t.id}"
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--c2);background:var(--c2l);color:var(--c2m);cursor:pointer;font-family:inherit">
+              📝 ອັບເດດ
+            </button>
+            <button onclick="setUpdateType(${t.id},'blocker')" id="utype-blocker-${t.id}"
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
+              ⛔ ຕິດຂັດ
+            </button>
+            <button onclick="setUpdateType(${t.id},'resolved')" id="utype-resolved-${t.id}"
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
+              ✅ ແກ້ໄຂໄດ້
+            </button>
+            <button onclick="setUpdateType(${t.id},'note')" id="utype-note-${t.id}"
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
+              💬 ໝາຍເຫດ
+            </button>
+          </div>
+        </div>
+
+        <div style="padding:0 2px;margin-bottom:10px">
+          <textarea id="comment-input-${t.id}" placeholder="ຂຽນ update, ຂໍ້ຕິດຂັດ, ຫຼື ໝາຍເຫດ..."
+            rows="2" style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
+            <button onclick="toggleComments(${t.id})" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit">ຍົກເລີກ</button>
+            <button onclick="submitUpdate(${t.id})" style="font-size:12px;padding:5px 14px;border:none;background:var(--c1);color:#fff;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-weight:600">💾 ບັນທຶກ update</button>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">ປະຫວັດ Update</div>
+          <div id="comment-list-${t.id}"><div style="font-size:12px;color:var(--muted)">ໂຫຼດ...</div></div>
         </div>
       </div>`;
     }).join('');
