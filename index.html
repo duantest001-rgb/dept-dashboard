@@ -214,6 +214,33 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
     </div>
 
+    <div class="card" id="editTaskForm" style="display:none">
+      <div class="card-title"><i class="ti ti-edit" style="color:var(--c2)"></i> ແກ້ໄຂວຽກ</div>
+      <input type="hidden" id="editTaskId">
+      <div class="form-row"><label>ຊື່ວຽກ *</label><input type="text" id="eName" placeholder="ຊື່ວຽກ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label><input type="text" id="eOwner"></div>
+        <div class="form-row"><label>ກຳນົດສ່ົງ</label><input type="date" id="eDue"></div>
+      </div>
+      <div class="row2">
+        <div class="form-row"><label>ຄວາມສຳຄັນ</label>
+          <select id="ePri"><option value="urgent">🔴 ດ່ວນ</option><option value="normal">🔵 ປົກກະຕິ</option></select>
+        </div>
+        <div class="form-row"><label>ສະຖານະ</label>
+          <select id="eStatus"><option value="inprogress">ກຳລັງດຳເນີນ</option><option value="blocked">ຕິດຂັດ</option><option value="done">ສຳເລັດ</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>ຄວາມຄືບໜ້າ: <strong id="eProgressVal">0%</strong></label>
+        <input type="range" id="eProgress" min="0" max="100" step="5" value="0" oninput="document.getElementById('eProgressVal').textContent=this.value+'%'" style="width:100%;accent-color:var(--c1)">
+      </div>
+      <div class="form-row"><label>ໝາຍເຫດ / ບັນຫາ</label><textarea id="eNotes" placeholder="ລາຍລະອຽດ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveEditTask()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-outline" onclick="document.getElementById('editTaskForm').style.display='none'">ຍົກເລີກ</button>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title"><i class="ti ti-lock" style="color:var(--c4)"></i> ບັນຫາ & ຕິດຂັດ</div>
       <div id="blockerList"><div class="spinner">ໂຫຼດ...</div></div>
@@ -419,7 +446,7 @@ function renderTasks() {
   document.getElementById('taskList').innerHTML = list.length===0
     ? '<div class="empty">ບໍ່ມີລາຍການ</div>'
     : list.map(t=>`
-      <div class="task-item">
+      <div class="task-item" id="ti-${t.id}">
         <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleDone(${t.id},'${t.status}')">${t.status==='done'?'✓':''}</div>
         <div class="task-info">
           <div class="task-name ${t.status==='done'?'done':''}">${t.name}</div>
@@ -432,8 +459,58 @@ function renderTasks() {
           <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c2)'}"></div></div>
           ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">💬 ${t.notes}</div>`:''}
         </div>
-        <span style="font-size:12px;font-weight:600;color:var(--muted);min-width:30px;text-align:right">${t.progress}%</span>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
+          <span style="font-size:12px;font-weight:600;color:var(--muted)">${t.progress}%</span>
+          <div style="display:flex;gap:4px">
+            <button onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>
+            <button onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>
+          </div>
+        </div>
       </div>`).join('');
+}
+
+function openEditTask(id) {
+  const t = allTasks.find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('eName').value = t.name;
+  document.getElementById('eOwner').value = t.owner;
+  document.getElementById('eDue').value = t.due_date;
+  document.getElementById('ePri').value = t.priority;
+  document.getElementById('eStatus').value = t.status;
+  document.getElementById('eProgress').value = t.progress;
+  document.getElementById('eProgressVal').textContent = t.progress+'%';
+  document.getElementById('eNotes').value = t.notes||'';
+  document.getElementById('editTaskId').value = id;
+  const form = document.getElementById('editTaskForm');
+  form.style.display='block';
+  form.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function saveEditTask() {
+  const id = parseInt(document.getElementById('editTaskId').value);
+  const n = document.getElementById('eName').value.trim();
+  if(!n){toast('⚠️ ໃສ່ຊື່ວຽກ');return;}
+  const {error} = await db.from('tasks').update({
+    name:n,
+    owner:document.getElementById('eOwner').value||'—',
+    due_date:document.getElementById('eDue').value||'—',
+    priority:document.getElementById('ePri').value,
+    status:document.getElementById('eStatus').value,
+    progress:parseInt(document.getElementById('eProgress').value),
+    notes:document.getElementById('eNotes').value
+  }).eq('id',id);
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ ແກ້ໄຂສຳເລັດ!');
+  document.getElementById('editTaskForm').style.display='none';
+  loadTasks();
+}
+
+async function deleteTask(id) {
+  if(!confirm('ຢືນຢັນລຶບວຽກນີ້?')) return;
+  const {error} = await db.from('tasks').delete().eq('id',id);
+  if(error){toast('❌ '+error.message);return;}
+  toast('🗑️ ລຶບສຳເລັດ');
+  loadTasks();
 }
 
 function renderBlockers() {
