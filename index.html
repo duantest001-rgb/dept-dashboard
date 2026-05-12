@@ -141,11 +141,46 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   </div>
 </div>
 
+<div class="app" id="loginPage" style="display:none">
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem">
+    <div style="width:100%;max-width:380px">
+      <div style="text-align:center;margin-bottom:2rem">
+        <div style="font-size:32px;margin-bottom:8px">🏢</div>
+        <h1 style="font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px">Dashboard ພະແນກ</h1>
+        <p style="font-size:13px;color:var(--muted)">ກະລຸນາ Login ກ່ອນໃຊ້ງານ</p>
+      </div>
+      <div class="card" style="padding:1.5rem">
+        <div class="form-row">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="form-row" style="margin-bottom:1.25rem">
+          <label>Password</label>
+          <div style="position:relative">
+            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+            <span onclick="togglePwd()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:13px" id="eyeIcon">👁</span>
+          </div>
+        </div>
+        <div id="loginError" style="display:none;background:var(--c4l);color:var(--c4m);padding:8px 12px;border-radius:var(--radius);font-size:13px;margin-bottom:12px"></div>
+        <button class="btn-primary" id="loginBtn" onclick="doLogin()" style="width:100%;padding:11px">Login</button>
+        <div style="text-align:center;margin-top:12px">
+          <span style="font-size:12px;color:var(--muted)">ລືມ Password? </span>
+          <span onclick="doReset()" style="font-size:12px;color:var(--c2);cursor:pointer;text-decoration:underline">Reset</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app" id="mainApp" style="display:none">
 
   <div class="topbar">
     <h1><i class="ti ti-building-community" style="color:var(--c1)"></i> Dashboard ພະແນກ</h1>
-    <span class="date" id="dateNow"></span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="date" id="dateNow"></span>
+      <span id="userEmail" style="font-size:12px;color:var(--muted);background:var(--c1l);padding:3px 10px;border-radius:12px;color:var(--c1m)"></span>
+      <button onclick="doLogout()" style="border:1px solid var(--border);background:transparent;border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit"><i class="ti ti-logout"></i> ອອກ</button>
+    </div>
   </div>
 
   <nav class="nav">
@@ -340,9 +375,73 @@ function initApp() {
     return;
   }
   db = createClient(SUPABASE_URL, SUPABASE_KEY);
+  checkSession();
+}
+
+async function checkSession() {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    showApp(session.user.email);
+  } else {
+    document.getElementById('loginPage').style.display = 'block';
+  }
+  db.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_IN') showApp(session.user.email);
+    if (event === 'SIGNED_OUT') showLogin();
+  });
+}
+
+function showApp(email) {
+  document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userEmail').textContent = email;
   document.getElementById('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   loadDash();
+}
+
+function showLogin() {
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginPage').style.display = 'block';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const btn = document.getElementById('loginBtn');
+  const errEl = document.getElementById('loginError');
+  if (!email || !password) { showErr('ກະລຸນາໃສ່ Email ແລະ Password'); return; }
+  btn.disabled = true; btn.textContent = 'ກຳລັງ Login...';
+  errEl.style.display = 'none';
+  const { error } = await db.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Login';
+  if (error) showErr(error.message === 'Invalid login credentials' ? '❌ Email ຫຼື Password ບໍ່ຖືກ' : '❌ ' + error.message);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+async function doLogout() {
+  if (!confirm('ຢືນຢັນອອກຈາກລະບົບ?')) return;
+  await db.auth.signOut();
+  showLogin();
+}
+
+async function doReset() {
+  const email = document.getElementById('loginEmail').value.trim();
+  if (!email) { showErr('ໃສ່ Email ກ່ອນກົດ Reset'); return; }
+  const { error } = await db.auth.resetPasswordForEmail(email);
+  if (error) showErr('❌ ' + error.message);
+  else { document.getElementById('loginError').style.display='none'; toast('📧 ສົ່ງ Reset email ໄປຫາ ' + email + ' ແລ້ວ!'); }
+}
+
+function togglePwd() {
+  const inp = document.getElementById('loginPassword');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  document.getElementById('eyeIcon').textContent = inp.type === 'password' ? '👁' : '🙈';
 }
 
 // ── State ──
