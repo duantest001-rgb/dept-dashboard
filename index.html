@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard ພະແນກ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── CONFIG: ໃສ່ຄ່ານີ້ກ່ອນ Deploy ── */
+/* ເປີດໄຟລ໌ config.js ແລ້ວໃສ່ URL + KEY */
+
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f8f6;--card:#fff;--border:#e5e3dc;--text:#1a1a18;--muted:#6b6b67;
+  --c1:#1D9E75;--c1l:#E1F5EE;--c1m:#0F6E56;
+  --c2:#378ADD;--c2l:#E6F1FB;--c2m:#185FA5;
+  --c3:#BA7517;--c3l:#FAEEDA;--c3m:#854F0B;
+  --c4:#D85A30;--c4l:#FAECE7;--c4m:#993C1D;
+  --c5:#7F77DD;--c5l:#EEEDFE;--c5m:#534AB7;
+  --radius:10px;--radius-lg:14px;
+}
+@media(prefers-color-scheme:dark){
+  :root{--bg:#1a1a18;--card:#242422;--border:#333330;--text:#f0ede8;--muted:#888883}
+}
+body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Layout ── */
+.app{max-width:960px;margin:0 auto;padding:1.25rem 1rem 3rem}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.topbar h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+.topbar .date{font-size:13px;color:var(--muted)}
+.nav{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.nav button{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;font-family:inherit}
+.nav button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.nav button:hover:not(.active){background:var(--border)}
+.page{display:none}.page.active{display:block}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.card-title{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:1rem}
+.metric{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem;text-align:center}
+.metric .num{font-size:26px;font-weight:600}.metric .lbl{font-size:11px;color:var(--muted);margin-top:3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:580px){.row2{grid-template-columns:1fr}}
+
+/* ── Config banner ── */
+.config-banner{background:var(--c3l);border:1px solid var(--c3);border-radius:var(--radius);padding:12px 16px;margin-bottom:1rem;font-size:13px;color:var(--c3m);display:flex;gap:10px;align-items:flex-start}
+.config-banner code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* ── Spinner ── */
+.spinner{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
+.spinner::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--c2);border-radius:50%;animation:spin .7s linear infinite;margin-left:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
+
+/* ── Task items ── */
+.task-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.task-item:last-child{border-bottom:none}
+.task-check{width:20px;height:20px;border-radius:5px;border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s}
+.task-check.done{background:var(--c1);border-color:var(--c1);color:#fff}
+.task-info{flex:1;min-width:0}
+.task-name{font-size:14px}.task-name.done{text-decoration:line-through;color:var(--muted)}
+.task-meta{font-size:12px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge.urgent{background:var(--c4l);color:var(--c4m)}.badge.normal{background:var(--c2l);color:var(--c2m)}
+.badge.done-b{background:var(--c1l);color:var(--c1m)}.badge.blocked{background:var(--c4l);color:var(--c4m)}
+.badge.inprogress{background:var(--c3l);color:var(--c3m)}
+.progress-bar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* ── Blockers ── */
+.blocker-item{padding:10px 14px;border-left:3px solid var(--c4);background:var(--c4l);border-radius:0 var(--radius) var(--radius) 0;margin-bottom:8px}
+.blocker-title{font-size:13px;font-weight:600;color:var(--c4m)}.blocker-meta{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* ── Doc flow ── */
+.doc-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.doc-item:last-child{border-bottom:none}
+.doc-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background:var(--c2l)}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:14px;font-weight:600}.doc-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.flow-steps{display:flex;align-items:flex-start;margin-top:8px;overflow-x:auto;padding-bottom:4px}
+.fstep-wrap{display:flex;align-items:center}
+.fstep{display:flex;flex-direction:column;align-items:center;min-width:56px}
+.fstep-circle{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+.fstep-label{font-size:9px;color:var(--muted);text-align:center;margin-top:4px;line-height:1.3;max-width:54px}
+.fstep-line{height:2px;width:16px;flex-shrink:0;margin-top:12px}
+.fstep.done .fstep-circle{background:var(--c1);color:#fff}
+.fstep.current .fstep-circle{background:var(--c2);color:#fff;box-shadow:0 0 0 3px var(--c2l)}
+.fstep.wait .fstep-circle{background:var(--border);color:var(--muted)}
+
+/* ── Meeting ── */
+.meeting-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.meeting-item:last-child{border-bottom:none}
+.meet-date{min-width:60px;text-align:center;background:var(--c2l);border-radius:var(--radius);padding:8px 4px}
+.meet-date .md{font-size:10px;color:var(--c2m)}.meet-date .mt{font-size:14px;font-weight:700;color:var(--c2m)}
+.meet-info{flex:1}
+.meet-title{font-size:14px;font-weight:600}
+.meet-detail{font-size:12px;color:var(--muted);margin-top:3px}
+.attendees{display:flex;gap:4px;margin-top:7px;flex-wrap:wrap}
+.avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+
+/* ── Forms ── */
+.form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.form-row label{font-size:12px;color:var(--muted);font-weight:600}
+.form-row input,.form-row select,.form-row textarea{padding:8px 11px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);font-size:14px;color:var(--text);width:100%;font-family:inherit}
+.form-row textarea{height:65px;resize:vertical}
+.btn-primary{background:var(--text);color:var(--bg);border:none;padding:9px 18px;border-radius:var(--radius);cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;transition:opacity .15s}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:var(--radius);cursor:pointer;font-size:13px;font-family:inherit}
+.btn-row{display:flex;gap:8px;margin-top:12px}
+.filter-btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filter-btns button{padding:5px 11px;border-radius:16px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit}
+.filter-btns button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+
+/* ── Alert / Announce ── */
+.alert{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:10px;display:flex;gap:8px;align-items:flex-start}
+.alert.warn{background:var(--c3l);color:var(--c3m)}.alert.info{background:var(--c2l);color:var(--c2m)}.alert.danger{background:var(--c4l);color:var(--c4m)}
+.announce{background:var(--c1l);border:1px solid var(--c1);border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:1rem;display:flex;gap:12px;align-items:center}
+.announce-text strong{font-size:14px;color:var(--c1m);display:block}.announce-text span{font-size:12px;color:var(--c1m);opacity:.8}
+
+/* ── Report ── */
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:90px;margin-top:8px}
+.bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
+.bar-fill{border-radius:4px 4px 0 0;width:100%}
+.bar-lbl{font-size:10px;color:var(--muted)}.bar-val{font-size:11px;font-weight:600;color:var(--muted)}
+
+/* ── Toast ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div id="config-warn" class="app" style="display:none">
+  <div class="config-banner">
+    <i class="ti ti-alert-triangle" style="font-size:18px;flex-shrink:0"></i>
+    <div>
+      <strong>ຕ້ອງຕັ້ງຄ່າ Supabase ກ່ອນ!</strong><br>
+      ໃຫ້ແກ້ໄຂ <code>SUPABASE_URL</code> ແລະ <code>SUPABASE_ANON_KEY</code> ຢູ່ດ້ານລຸ່ມຂອງ script ໃນໄຟລ໌ <code>index.html</code> ນີ້ ແລ້ວ reload ໃໝ່.
+    </div>
+  </div>
+</div>
+
+<div class="app" id="mainApp" style="display:none">
+
+  <div class="topbar">
+    <h1><i class="ti ti-building-community" style="color:var(--c1)"></i> Dashboard ພະແນກ</h1>
+    <span class="date" id="dateNow"></span>
+  </div>
+
+  <nav class="nav">
+    <button class="active" onclick="showPage('dash',this)"><i class="ti ti-home"></i> Overview</button>
+    <button onclick="showPage('tasks',this)"><i class="ti ti-checkbox"></i> ໜ້າວຽກ</button>
+    <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
+    <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ປະຊຸມ</button>
+    <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
+  </nav>
+
+  <!-- ── OVERVIEW ── -->
+  <div class="page active" id="page-dash">
+    <div class="metrics" id="metricsBar"><div class="spinner">ໂຫຼດ...</div></div>
+    <div id="blockerAlert"></div>
+    <div class="row2">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-flame" style="color:var(--c4)"></i> ວຽກດ່ວນ</div>
+        <div id="urgentPreview"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-file-time" style="color:var(--c3)"></i> ເອກະສານລໍຖ້າ</div>
+        <div id="docPreview"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-calendar" style="color:var(--c2)"></i> ກອງປະຊຸມໃກ້ຮອດ</div>
+      <div id="meetPreview"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+    <div id="announceArea"></div>
+  </div>
+
+  <!-- ── TASKS ── -->
+  <div class="page" id="page-tasks">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:13px;color:var(--muted)">ທັງໝົດ <strong id="taskCount" style="color:var(--text)">—</strong> ລາຍການ</span>
+      <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
+    </div>
+    <div class="filter-btns">
+      <button class="active" onclick="setFilter('all',this)">ທັງໝົດ</button>
+      <button onclick="setFilter('urgent',this)">ດ່ວນ</button>
+      <button onclick="setFilter('inprogress',this)">ດຳເນີນຢູ່</button>
+      <button onclick="setFilter('blocked',this)">ຕິດຂັດ</button>
+      <button onclick="setFilter('done',this)">ສຳເລັດ</button>
+    </div>
+    <div class="card"><div id="taskList"><div class="spinner">ໂຫຼດ...</div></div></div>
+
+    <div class="card" id="addTaskForm" style="display:none">
+      <div class="card-title"><i class="ti ti-plus-circle"></i> ເພີ່ມໜ້າວຽກໃໝ່</div>
+      <div class="form-row"><label>ຊື່ວຽກ *</label><input type="text" id="tName" placeholder="ຊື່ວຽກ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label><input type="text" id="tOwner" placeholder="ຊື່ຄົນ..."></div>
+        <div class="form-row"><label>ກຳນົດສ່ົງ</label><input type="date" id="tDue"></div>
+      </div>
+      <div class="row2">
+        <div class="form-row"><label>ຄວາມສຳຄັນ</label>
+          <select id="tPri"><option value="urgent">🔴 ດ່ວນ</option><option value="normal" selected>🔵 ປົກກະຕິ</option></select>
+        </div>
+        <div class="form-row"><label>ສະຖານະ</label>
+          <select id="tStatus"><option value="inprogress">ກຳລັງດຳເນີນ</option><option value="blocked">ຕິດຂັດ</option><option value="done">ສຳເລັດ</option></select>
+        </div>
+      </div>
+      <div class="form-row"><label>ໝາຍເຫດ / ບັນຫາ</label><textarea id="tNotes" placeholder="ລາຍລະອຽດ ຫຼື ຂໍ້ຕິດຂັດ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" id="saveTaskBtn" onclick="saveTask()">💾 ບັນທຶກ</button>
+        <button class="btn-outline" onclick="toggleForm('addTaskForm')">ຍົກເລີກ</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-lock" style="color:var(--c4)"></i> ບັນຫາ & ຕິດຂັດ</div>
+      <div id="blockerList"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+  </div>
+
+  <!-- ── DOCUMENTS ── -->
+  <div class="page" id="page-docs">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--muted)">ຕິດຕາມເສັ້ນທາງເອກະສານ</span>
+      <button class="btn-outline" onclick="toggleForm('addDocForm')"><i class="ti ti-plus"></i> ເພີ່ມເອກະສານ</button>
+    </div>
+    <div class="card"><div id="docList"><div class="spinner">ໂຫຼດ...</div></div></div>
+    <div class="card" id="addDocForm" style="display:none">
+      <div class="card-title"><i class="ti ti-file-plus"></i> ເພີ່ມເອກະສານໃໝ່</div>
+      <div class="form-row"><label>ຊື່ເອກະສານ *</label><input type="text" id="dName" placeholder="ຊື່ເອກະສານ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ປະເພດ</label>
+          <select id="dType"><option>📄 ບົດລາຍງານ</option><option>📋 ຂໍ້ສະເໜີ</option><option>📑 ສັນຍາ</option><option>📊 ງົບປະມານ</option></select>
+        </div>
+        <div class="form-row"><label>ສ້າງໂດຍ</label><input type="text" id="dFrom" placeholder="ຊື່ຜູ້ສ້າງ..."></div>
+      </div>
+      <div class="form-row"><label>ສ່ົງຫາ</label><input type="text" id="dTo" placeholder="ຊື່ຜູ້ຮັບ..."></div>
+      <div class="form-row"><label>ຂັ້ນຕອນ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="dSteps" value="ສ້າງ,ກວດ,ອະນຸມັດ" placeholder="ສ້າງ,ກວດ,ໜ.ພ.,CFO,ອະນຸມັດ"></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveDoc()">💾 ບັນທຶກ</button>
+        <button class="btn-outline" onclick="toggleForm('addDocForm')">ຍົກເລີກ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MEETINGS ── -->
+  <div class="page" id="page-meet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--muted)">ຕາຕະລາງກອງປະຊຸມ</span>
+      <button class="btn-outline" onclick="toggleForm('addMeetForm')"><i class="ti ti-plus"></i> ນັດໃໝ່</button>
+    </div>
+    <div class="card"><div id="meetList"><div class="spinner">ໂຫຼດ...</div></div></div>
+    <div class="card" id="addMeetForm" style="display:none">
+      <div class="card-title"><i class="ti ti-calendar-plus"></i> ນັດກອງປະຊຸມໃໝ່</div>
+      <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="mTitle" placeholder="ຊື່ກອງປະຊຸມ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ວັນທີ</label><input type="date" id="mDate"></div>
+        <div class="form-row"><label>ເວລາ</label><input type="time" id="mTime"></div>
+      </div>
+      <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="mLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
+      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="mAtt" placeholder="ສສ,ບທ,ມລ..."></div>
+      <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="mNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveMeet()">💾 ບັນທຶກ</button>
+        <button class="btn-outline" onclick="toggleForm('addMeetForm')">ຍົກເລີກ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── REPORT ── -->
+  <div class="page" id="page-report">
+    <div class="metrics" id="reportMetrics"><div class="spinner">ໂຫຼດ...</div></div>
+    <div class="row2">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-bar" style="color:var(--c1)"></i> ສະຖານະວຽກ</div>
+        <div class="bar-chart" id="taskBarChart"></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-files" style="color:var(--c2)"></i> ເອກະສານ</div>
+        <div class="bar-chart" id="docBarChart"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><i class="ti ti-list-check" style="color:var(--c3)"></i> Progress ວຽກທັງໝົດ</div>
+      <div id="reportProgress"></div>
+    </div>
+  </div>
+
+</div><!-- /mainApp -->
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+//  ⚙️  CONFIG — ແກ້ຄ່ານີ້ກ່ອນ Deploy
+// ════════════════════════════════════════════
+const SUPABASE_URL  = 'https://uyvmrqblpttvxvbyvyfa.supabase.co';   // ← ໃສ່ URL ຂອງເຈົ້ານີ້
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5dm1ycWJscHR0dnh2Ynl2eWZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1NDkyNDYsImV4cCI6MjA5NDEyNTI0Nn0.Y4XmNdJt4LiiewbPtKJlsYjt7oCTEqZBNA9X5qrukms';                      // ← ໃສ່ anon/public key ຂອງເຈົ້ານີ້
+// ════════════════════════════════════════════
+
+const { createClient } = supabase;
+let db;
+
+function initApp() {
+  if (SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON')) {
+    document.getElementById('config-warn').style.display = 'block';
+    return;
+  }
+  db = createClient(SUPABASE_URL, SUPABASE_KEY);
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  loadDash();
+}
+
+// ── State ──
+let allTasks=[], allDocs=[], allMeets=[], currentFilter='all';
+
+// ── Page nav ──
+function showPage(p, btn) {
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  if(btn) btn.classList.add('active');
+  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, report:loadReport};
+  if(map[p]) map[p]();
+}
+
+function toggleForm(id) {
+  const el = document.getElementById(id);
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+  if(el.style.display==='block') el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function toast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// ── Colours ──
+const acBg  =['#E1F5EE','#E6F1FB','#FAEEDA','#EEEDFE','#FAECE7'];
+const acText=['#0F6E56','#185FA5','#854F0B','#534AB7','#993C1D'];
+
+// ════ DASHBOARD ════
+async function loadDash() {
+  const [tasksRes, docsRes, meetsRes, annRes] = await Promise.all([
+    db.from('tasks').select('*').order('created_at',{ascending:false}),
+    db.from('documents').select('*').order('created_at',{ascending:false}),
+    db.from('meetings').select('*').order('meet_date'),
+    db.from('announcements').select('*').order('created_at',{ascending:false}),
+  ]);
+  allTasks = tasksRes.data||[];
+  allDocs  = docsRes.data||[];
+  allMeets = meetsRes.data||[];
+
+  const done=allTasks.filter(t=>t.status==='done').length;
+  const inprog=allTasks.filter(t=>t.status==='inprogress').length;
+  const blk=allTasks.filter(t=>t.status==='blocked').length;
+  const pendDoc=allDocs.filter(d=>d.current_step<(d.steps||[]).length-1).length;
+
+  document.getElementById('metricsBar').innerHTML=`
+    <div class="metric"><div class="num" style="color:var(--c2)">${allTasks.length}</div><div class="lbl">ວຽກທັງໝົດ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c1)">${done}</div><div class="lbl">ສຳເລັດ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c3)">${inprog}</div><div class="lbl">ດຳເນີນຢູ່</div></div>
+    <div class="metric"><div class="num" style="color:var(--c4)">${blk}</div><div class="lbl">ຕິດຂັດ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c5)">${pendDoc}</div><div class="lbl">ເອກະສານລໍຖ້າ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c2)">${allMeets.length}</div><div class="lbl">ກອງປະຊຸມ</div></div>`;
+
+  document.getElementById('blockerAlert').innerHTML = blk>0
+    ? `<div class="alert warn"><i class="ti ti-alert-triangle"></i> ວຽກຕິດຂັດ ${blk} ລາຍການ — ຕ້ອງການການຕັດສິນໃຈ</div>` : '';
+
+  const urgent = allTasks.filter(t=>t.priority==='urgent');
+  document.getElementById('urgentPreview').innerHTML = urgent.length===0
+    ? '<div class="empty">✅ ບໍ່ມີວຽກດ່ວນ</div>'
+    : urgent.map(t=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c3)'};margin-right:6px"></span>${t.name}
+        <br><span style="font-size:11px;color:var(--muted);margin-left:14px">${t.owner} · ${t.due_date}</span>
+      </div>`).join('');
+
+  const pendDocs = allDocs.filter(d=>d.current_step<(d.steps||[]).length-1);
+  document.getElementById('docPreview').innerHTML = pendDocs.length===0
+    ? '<div class="empty">✅ ບໍ່ມີເອກະສານຄ້າງ</div>'
+    : pendDocs.map(d=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+        ${d.doc_type} ${d.name}
+        <br><span style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${(d.steps||[])[d.current_step]||'—'}</span>
+      </div>`).join('');
+
+  const next2 = [...allMeets].sort((a,b)=>a.meet_date+a.meet_time>b.meet_date+b.meet_time?1:-1).slice(0,2);
+  document.getElementById('meetPreview').innerHTML = next2.length===0
+    ? '<div class="empty">ບໍ່ມີກອງປະຊຸມ</div>'
+    : next2.map(m=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
+        <i class="ti ti-calendar-event" style="color:var(--c2);font-size:13px"></i> <strong>${m.title}</strong>
+        <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date} ${m.meet_time} · ${m.location}</span>
+      </div>`).join('');
+
+  const anns = annRes.data||[];
+  document.getElementById('announceArea').innerHTML = anns.map(a=>`
+    <div class="announce">
+      <span style="font-size:22px">📢</span>
+      <div class="announce-text"><strong>${a.message}</strong><span>ໂດຍ ${a.author}</span></div>
+    </div>`).join('');
+}
+
+// ════ TASKS ════
+async function loadTasks() {
+  const {data} = await db.from('tasks').select('*').order('created_at',{ascending:false});
+  allTasks = data||[];
+  renderTasks();
+  renderBlockers();
+}
+
+function renderTasks() {
+  let list = currentFilter==='all' ? allTasks
+    : currentFilter==='urgent' ? allTasks.filter(t=>t.priority==='urgent')
+    : allTasks.filter(t=>t.status===currentFilter);
+  document.getElementById('taskCount').textContent = list.length;
+  document.getElementById('taskList').innerHTML = list.length===0
+    ? '<div class="empty">ບໍ່ມີລາຍການ</div>'
+    : list.map(t=>`
+      <div class="task-item">
+        <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleDone(${t.id},'${t.status}')">${t.status==='done'?'✓':''}</div>
+        <div class="task-info">
+          <div class="task-name ${t.status==='done'?'done':''}">${t.name}</div>
+          <div class="task-meta">
+            <span><i class="ti ti-user" style="font-size:11px"></i> ${t.owner}</span>
+            <span><i class="ti ti-calendar" style="font-size:11px"></i> ${t.due_date}</span>
+            <span class="badge ${t.priority}">${t.priority==='urgent'?'🔴 ດ່ວນ':'🔵 ປົກກະຕິ'}</span>
+            <span class="badge ${t.status==='done'?'done-b':t.status==='blocked'?'blocked':'inprogress'}">${{done:'ສຳເລັດ',inprogress:'ດຳເນີນຢູ່',blocked:'ຕິດຂັດ'}[t.status]||t.status}</span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c2)'}"></div></div>
+          ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">💬 ${t.notes}</div>`:''}
+        </div>
+        <span style="font-size:12px;font-weight:600;color:var(--muted);min-width:30px;text-align:right">${t.progress}%</span>
+      </div>`).join('');
+}
+
+function renderBlockers() {
+  const blk = allTasks.filter(t=>t.status==='blocked');
+  document.getElementById('blockerList').innerHTML = blk.length===0
+    ? '<div class="empty">✅ ບໍ່ມີວຽກຕິດຂັດ</div>'
+    : blk.map(t=>`<div class="blocker-item">
+        <div class="blocker-title">⛔ ${t.name}</div>
+        <div class="blocker-meta">ຮັບຜິດຊອບ: ${t.owner} · ກຳນົດ: ${t.due_date}${t.notes?' · '+t.notes:''}</div>
+      </div>`).join('');
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btns button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTasks();
+}
+
+async function toggleDone(id, status) {
+  const newStatus = status==='done' ? 'inprogress' : 'done';
+  const newProg   = newStatus==='done' ? 100 : 80;
+  await db.from('tasks').update({status:newStatus, progress:newProg}).eq('id',id);
+  toast(newStatus==='done'?'✅ ໝາຍສຳເລັດ!':'↩️ ຍ້ອນກັບ');
+  loadTasks();
+}
+
+async function saveTask() {
+  const n = document.getElementById('tName').value.trim();
+  if(!n){toast('⚠️ ໃສ່ຊື່ວຽກດ້ວຍ');return;}
+  const btn = document.getElementById('saveTaskBtn');
+  btn.disabled=true; btn.textContent='ກຳລັງບັນທຶກ...';
+  const {error} = await db.from('tasks').insert({
+    name:n, owner:document.getElementById('tOwner').value||'—',
+    due_date:document.getElementById('tDue').value||'—',
+    priority:document.getElementById('tPri').value,
+    status:document.getElementById('tStatus').value,
+    notes:document.getElementById('tNotes').value,
+    progress: document.getElementById('tStatus').value==='done'?100:0
+  });
+  btn.disabled=false; btn.textContent='💾 ບັນທຶກ';
+  if(error){toast('❌ Error: '+error.message);return;}
+  toast('✅ ເພີ່ມວຽກສຳເລັດ!');
+  toggleForm('addTaskForm');
+  ['tName','tOwner','tNotes'].forEach(id=>document.getElementById(id).value='');
+  loadTasks();
+}
+
+// ════ DOCUMENTS ════
+async function loadDocs() {
+  const {data} = await db.from('documents').select('*').order('created_at',{ascending:false});
+  allDocs = data||[];
+  renderDocs();
+}
+
+function renderDocs() {
+  document.getElementById('docList').innerHTML = allDocs.length===0
+    ? '<div class="empty">ບໍ່ມີເອກະສານ</div>'
+    : allDocs.map(d=>{
+      const steps = d.steps||[];
+      const stepsHtml = steps.map((s,i)=>{
+        const cls = i<d.current_step?'done':i===d.current_step?'current':'wait';
+        const line = i<steps.length-1?`<div class="fstep-line" style="background:${i<d.current_step?'var(--c1)':'var(--border)'}"></div>`:'';
+        return `<div class="fstep-wrap"><div class="fstep ${cls}"><div class="fstep-circle">${i<d.current_step?'✓':i+1}</div><div class="fstep-label">${s}</div></div>${line}</div>`;
+      }).join('');
+      const isDone = d.current_step>=steps.length-1;
+      return `<div class="doc-item">
+        <div class="doc-icon">${d.doc_type}</div>
+        <div class="doc-info">
+          <div class="doc-name">${d.name} ${isDone?'<span class="badge done-b">ສຳເລັດ</span>':''}</div>
+          <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
+          <div class="flow-steps">${stepsHtml}</div>
+          ${!isDone?`<button class="btn-outline" style="margin-top:8px;font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function advanceDoc(id, cur, total) {
+  if(cur>=total-1) return;
+  await db.from('documents').update({current_step:cur+1}).eq('id',id);
+  toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  loadDocs();
+}
+
+async function saveDoc() {
+  const n = document.getElementById('dName').value.trim();
+  if(!n){toast('⚠️ ໃສ່ຊື່ເອກະສານ');return;}
+  const tp = document.getElementById('dType').value.split(' ')[0];
+  const rawSteps = document.getElementById('dSteps').value;
+  const steps = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
+  const {error} = await db.from('documents').insert({
+    name:n, doc_type:tp,
+    created_by:document.getElementById('dFrom').value||'—',
+    sent_to:document.getElementById('dTo').value||'—',
+    steps:steps, current_step:0
+  });
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
+  toggleForm('addDocForm');
+  ['dName','dFrom','dTo'].forEach(id=>document.getElementById(id).value='');
+  loadDocs();
+}
+
+// ════ MEETINGS ════
+async function loadMeet() {
+  const {data} = await db.from('meetings').select('*').order('meet_date');
+  allMeets = data||[];
+  document.getElementById('meetList').innerHTML = allMeets.length===0
+    ? '<div class="empty">ບໍ່ມີກອງປະຊຸມ</div>'
+    : allMeets.map(m=>{
+      const att = m.attendees||[];
+      const avatars = att.map((a,i)=>`<div class="avatar" style="background:${acBg[i%5]};color:${acText[i%5]}">${a}</div>`).join('');
+      return `<div class="meeting-item">
+        <div class="meet-date"><div class="md">${m.meet_date.slice(5)}</div><div class="mt">${m.meet_time}</div></div>
+        <div class="meet-info">
+          <div class="meet-title">${m.title}</div>
+          <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location}${m.notes?' · '+m.notes:''}</div>
+          <div class="attendees">${avatars}</div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+async function saveMeet() {
+  const t = document.getElementById('mTitle').value.trim();
+  if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
+  const rawAtt = document.getElementById('mAtt').value;
+  const att = rawAtt.split(',').map(s=>s.trim()).filter(Boolean);
+  const {error} = await db.from('meetings').insert({
+    title:t, meet_date:document.getElementById('mDate').value||'—',
+    meet_time:document.getElementById('mTime').value||'—',
+    location:document.getElementById('mLoc').value||'ຫ້ອງປະຊຸມ',
+    notes:document.getElementById('mNote').value, attendees:att
+  });
+  if(error){toast('❌ '+error.message);return;}
+  toast('✅ ນັດກອງປະຊຸມສຳເລັດ!');
+  toggleForm('addMeetForm');
+  ['mTitle','mLoc','mAtt','mNote'].forEach(id=>document.getElementById(id).value='');
+  loadMeet();
+}
+
+// ════ REPORT ════
+async function loadReport() {
+  const [tRes, dRes] = await Promise.all([
+    db.from('tasks').select('*'),
+    db.from('documents').select('*'),
+  ]);
+  const t=tRes.data||[], d=dRes.data||[];
+  const done=t.filter(x=>x.status==='done').length;
+  const inp=t.filter(x=>x.status==='inprogress').length;
+  const blk=t.filter(x=>x.status==='blocked').length;
+  const pct=t.length?Math.round(done/t.length*100):0;
+  document.getElementById('reportMetrics').innerHTML=`
+    <div class="metric"><div class="num" style="color:var(--c1)">${pct}%</div><div class="lbl">ຄວາມຄືບໜ້າ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c1)">${done}</div><div class="lbl">ສຳເລັດ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c3)">${inp}</div><div class="lbl">ດຳເນີນ</div></div>
+    <div class="metric"><div class="num" style="color:var(--c4)">${blk}</div><div class="lbl">ຕິດຂັດ</div></div>`;
+
+  const mx=Math.max(done,inp,blk,1);
+  document.getElementById('taskBarChart').innerHTML=[
+    {l:'ສຳເລັດ',v:done,c:'var(--c1)'},{l:'ດຳເນີນ',v:inp,c:'var(--c2)'},{l:'ຕິດຂັດ',v:blk,c:'var(--c4)'}
+  ].map(b=>`<div class="bar-col"><div class="bar-val">${b.v}</div><div class="bar-fill" style="height:${Math.max(b.v/mx*70,4)}px;background:${b.c}"></div><div class="bar-lbl">${b.l}</div></div>`).join('');
+
+  const dApproved=d.filter(x=>x.current_step>=(x.steps||[]).length-1).length;
+  const dPend=d.length-dApproved;
+  const mx2=Math.max(dApproved,dPend,1);
+  document.getElementById('docBarChart').innerHTML=[
+    {l:'ສຳເລັດ',v:dApproved,c:'var(--c1)'},{l:'ລໍຖ້າ',v:dPend,c:'var(--c3)'}
+  ].map(b=>`<div class="bar-col"><div class="bar-val">${b.v}</div><div class="bar-fill" style="height:${Math.max(b.v/mx2*70,4)}px;background:${b.c}"></div><div class="bar-lbl">${b.l}</div></div>`).join('');
+
+  document.getElementById('reportProgress').innerHTML = t.map(x=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="width:150px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.name}</div>
+      <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${x.progress}%;background:${x.status==='blocked'?'var(--c4)':x.status==='done'?'var(--c1)':'var(--c2)'};border-radius:4px"></div>
+      </div>
+      <span style="font-size:12px;font-weight:600;min-width:32px;text-align:right;color:var(--muted)">${x.progress}%</span>
+    </div>`).join('');
+}
+
+initApp();
+</script>
+</body>
+</html>
