@@ -183,6 +183,10 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <span style="font-size:13px;color:var(--muted)">ທັງໝົດ <strong id="taskCount" style="color:var(--text)">—</strong> ລາຍການ</span>
       <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
     </div>
+    <div style="position:relative;margin-bottom:10px">
+      <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
+      <input type="text" id="taskSearch" placeholder="ຄົ້ນຫາຊື່ວຽກ ຫຼື ຜູ້ຮັບຜິດຊອບ..." oninput="renderTasks()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+    </div>
     <div class="filter-btns">
       <button class="active" onclick="setFilter('all',this)">ທັງໝົດ</button>
       <button onclick="setFilter('urgent',this)">ດ່ວນ</button>
@@ -438,21 +442,38 @@ async function loadTasks() {
   renderBlockers();
 }
 
+function getDueInfo(due_date, status) {
+  if (status === 'done' || !due_date || due_date === '—') return {label: due_date, cls: '', tag: ''};
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due = new Date(due_date); due.setHours(0,0,0,0);
+  const diff = Math.ceil((due - today) / (1000*60*60*24));
+  if (diff < 0)  return {label: due_date, cls: 'color:var(--c4);font-weight:600', tag: `<span class="badge urgent" style="font-size:10px">ຊ້າ ${Math.abs(diff)} ວັນ</span>`};
+  if (diff === 0) return {label: due_date, cls: 'color:var(--c4);font-weight:600', tag: `<span class="badge urgent" style="font-size:10px">ໝົດວັນນີ້!</span>`};
+  if (diff <= 3)  return {label: due_date, cls: 'color:var(--c3);font-weight:600', tag: `<span class="badge review" style="font-size:10px">ອີກ ${diff} ວັນ</span>`};
+  return {label: due_date, cls: '', tag: ''};
+}
+
 function renderTasks() {
+  const q = (document.getElementById('taskSearch')?.value||'').toLowerCase();
   let list = currentFilter==='all' ? allTasks
     : currentFilter==='urgent' ? allTasks.filter(t=>t.priority==='urgent')
     : allTasks.filter(t=>t.status===currentFilter);
+  if (q) list = list.filter(t => t.name.toLowerCase().includes(q) || (t.owner||'').toLowerCase().includes(q));
   document.getElementById('taskCount').textContent = list.length;
   document.getElementById('taskList').innerHTML = list.length===0
     ? '<div class="empty">ບໍ່ມີລາຍການ</div>'
-    : list.map(t=>`
-      <div class="task-item" id="ti-${t.id}">
+    : list.map(t=>{
+      const due = getDueInfo(t.due_date, t.status);
+      const rowBg = t.status!=='done' && due.tag.includes('ຊ້າ') ? 'background:var(--c4l);' : t.status!=='done' && due.tag.includes('ໝົດ') ? 'background:var(--c4l);' : t.status!=='done' && due.tag.includes('ອີກ') ? 'background:var(--c3l);' : '';
+      return `
+      <div class="task-item" id="ti-${t.id}" style="${rowBg}">
         <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleDone(${t.id},'${t.status}')">${t.status==='done'?'✓':''}</div>
         <div class="task-info">
           <div class="task-name ${t.status==='done'?'done':''}">${t.name}</div>
           <div class="task-meta">
             <span><i class="ti ti-user" style="font-size:11px"></i> ${t.owner}</span>
-            <span><i class="ti ti-calendar" style="font-size:11px"></i> ${t.due_date}</span>
+            <span style="${due.cls}"><i class="ti ti-calendar" style="font-size:11px"></i> ${due.label}</span>
+            ${due.tag}
             <span class="badge ${t.priority}">${t.priority==='urgent'?'🔴 ດ່ວນ':'🔵 ປົກກະຕິ'}</span>
             <span class="badge ${t.status==='done'?'done-b':t.status==='blocked'?'blocked':'inprogress'}">${{done:'ສຳເລັດ',inprogress:'ດຳເນີນຢູ່',blocked:'ຕິດຂັດ'}[t.status]||t.status}</span>
           </div>
@@ -583,7 +604,10 @@ function renderDocs() {
           <div class="doc-name">${d.name} ${isDone?'<span class="badge done-b">ສຳເລັດ</span>':''}</div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
           <div class="flow-steps">${stepsHtml}</div>
-          ${!isDone?`<button class="btn-outline" style="margin-top:8px;font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            ${!isDone?`<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
+            <button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -593,6 +617,14 @@ async function advanceDoc(id, cur, total) {
   if(cur>=total-1) return;
   await db.from('documents').update({current_step:cur+1}).eq('id',id);
   toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  loadDocs();
+}
+
+async function deleteDoc(id) {
+  if(!confirm('ຢືນຢັນລຶບເອກະສານນີ້?')) return;
+  const {error} = await db.from('documents').delete().eq('id',id);
+  if(error){toast('❌ '+error.message);return;}
+  toast('🗑️ ລຶບສຳເລັດ');
   loadDocs();
 }
 
@@ -630,9 +662,20 @@ async function loadMeet() {
           <div class="meet-title">${m.title}</div>
           <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location}${m.notes?' · '+m.notes:''}</div>
           <div class="attendees">${avatars}</div>
+          <div style="margin-top:6px">
+            <button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+          </div>
         </div>
       </div>`;
     }).join('');
+}
+
+async function deleteMeet(id) {
+  if(!confirm('ຢືນຢັນລຶບກອງປະຊຸມນີ້?')) return;
+  const {error} = await db.from('meetings').delete().eq('id',id);
+  if(error){toast('❌ '+error.message);return;}
+  toast('🗑️ ລຶບສຳເລັດ');
+  loadMeet();
 }
 
 async function saveMeet() {
