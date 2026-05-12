@@ -542,8 +542,7 @@ function renderBlockers() {
     : blk.map(t=>`<div class="blocker-item">
         <div class="blocker-title">⛔ ${t.name}</div>
         <div class="blocker-meta">ຮັບຜິດຊອບ: ${t.owner} · ກຳນົດ: ${t.due_date}${t.notes?' · '+t.notes:''}</div>
-      </div>`;
-    }).join('');
+      </div>`).join('');
 }
 
 function setFilter(f, btn) {
