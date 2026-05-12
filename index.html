@@ -570,6 +570,65 @@ async function loadLog() {
 }
 
 // ── COMMENTS ─────────────────────────────────────
+// ── COMMENT PREVIEW (show latest in task list) ──────────
+async function loadAllCommentPreviews() {
+  const { data } = await db.from('task_comments')
+    .select('*')
+    .order('created_at', {ascending: false});
+  if (!data) return;
+
+  // Group by task_id — take latest 2 per task
+  const byTask = {};
+  data.forEach(c => {
+    if (!byTask[c.task_id]) byTask[c.task_id] = [];
+    if (byTask[c.task_id].length < 2) byTask[c.task_id].push(c);
+  });
+
+  Object.entries(byTask).forEach(([taskId, comments]) => {
+    const el = document.getElementById(`comment-preview-${taskId}`);
+    if (!el) return;
+    const typeIcon = {update:'📝', blocker:'⛔', resolved:'✅', note:'💬'};
+    const typeBg   = {update:'var(--c2l)', blocker:'var(--c4l)', resolved:'var(--c1l)', note:'#F1EFE8'};
+    const typeCol  = {update:'var(--c2m)', blocker:'var(--c4m)', resolved:'var(--c1m)', note:'#5F5E5A'};
+    el.innerHTML = comments.map(c => {
+      const ut  = c.update_type || 'note';
+      const bg  = typeBg[ut]  || '#F1EFE8';
+      const col = typeCol[ut] || '#5F5E5A';
+      const icon = typeIcon[ut] || '💬';
+      const who  = (c.user_email||'').split('@')[0];
+      const ackd = c.ack_by ? `<span style="font-size:10px;background:#E1F5EE;color:#0F6E56;padding:1px 6px;border-radius:8px;margin-left:4px">✓ ຮັບຮູ້</span>` : '';
+      const fixed = c.fixed_by ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:8px;margin-left:4px">🔧 ແກ້ໄປ</span>` : '';
+      const canAck   = !c.ack_by   && currentUser && c.user_id !== currentUser.id;
+      const canFixed = !c.fixed_by && currentUser && c.user_id !== currentUser.id;
+      return `<div style="background:${bg};border-radius:6px;padding:5px 8px;margin-bottom:4px;font-size:12px;color:${col}">
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+          <span style="font-weight:500">${icon} ${who}:</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.body}</span>
+          ${ackd}${fixed}
+        </div>
+        ${(canAck || canFixed) ? `<div style="display:flex;gap:4px;margin-top:4px">
+          ${canAck   ? `<button onclick="ackComment(${c.id},${taskId},'ack')"   style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;font-family:inherit">✓ ຮັບຮູ້</button>` : ''}
+          ${canFixed ? `<button onclick="ackComment(${c.id},${taskId},'fixed')" style="font-size:10px;padding:2px 7px;border-radius:6px;border:1px solid #185FA5;background:#E6F1FB;color:#185FA5;cursor:pointer;font-family:inherit">🔧 ແກ້ໄປ</button>` : ''}
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  });
+}
+
+async function ackComment(commentId, taskId, type) {
+  const field = type === 'ack' ? 'ack_by' : 'fixed_by';
+  const label = type === 'ack' ? '✓ ຮັບຮູ້' : '🔧 ແກ້ໄປ';
+  await db.from('task_comments').update({
+    [field]: currentUser?.email || '—'
+  }).eq('id', commentId);
+  toast(`${label} ແລ້ວ!`);
+  // refresh preview only
+  await loadAllCommentPreviews();
+  // also refresh full comment list if open
+  const open = document.getElementById(`comments-${taskId}`);
+  if (open && open.style.display !== 'none') await loadComments(taskId);
+}
+
 // track update type per task
 const updateTypes = {};
 
@@ -622,14 +681,22 @@ async function loadComments(taskId) {
         const icon = typeIcon[ut]||'💬';
         const bg = typeBg[ut]||'var(--c5l)';
         const col = typeColor[ut]||'var(--c5m)';
+        const canAck   = !c.ack_by   && currentUser && c.user_id !== currentUser.id;
+        const canFixed = !c.fixed_by && currentUser && c.user_id !== currentUser.id;
         return `<div class="comment-item" style="border-left:3px solid ${col};padding-left:10px;border-radius:0">
           <div class="comment-header">
             <div class="comment-avatar" style="background:${bg};color:${col}">${initials}</div>
             <span class="comment-meta" style="font-weight:600;color:${col}">${icon} ${{update:'ອັບເດດ',blocker:'ຕິດຂັດ',resolved:'ແກ້ໄຂໄດ້',note:'ໝາຍເຫດ'}[ut]||ut}</span>
             <span class="comment-meta">${c.user_email} · ${dt}</span>
+            ${c.ack_by?`<span style="font-size:10px;background:#E1F5EE;color:#0F6E56;padding:1px 6px;border-radius:8px">✓ ຮັບຮູ້ໂດຍ ${c.ack_by.split('@')[0]}</span>`:''}
+            ${c.fixed_by?`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:8px">🔧 ແກ້ໄປໂດຍ ${c.fixed_by.split('@')[0]}</span>`:''}
           </div>
           <div class="comment-body" style="margin-top:4px">${c.body}</div>
           ${c.progress_snapshot!=null?`<div style="font-size:11px;color:var(--muted);margin-top:3px;padding-left:32px">Progress: ${c.progress_snapshot}% | Status: ${{inprogress:'ດຳເນີນ',blocked:'ຕິດຂັດ',done:'ສຳເລັດ'}[c.status_snapshot]||c.status_snapshot||'—'}</div>`:''}
+          ${(canAck||canFixed)?`<div style="display:flex;gap:6px;margin-top:6px;padding-left:0">
+            ${canAck?`<button onclick="ackComment(${c.id},${taskId},'ack')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;font-family:inherit">✓ ຮັບຮູ້</button>`:''}
+            ${canFixed?`<button onclick="ackComment(${c.id},${taskId},'fixed')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #185FA5;background:#E6F1FB;color:#185FA5;cursor:pointer;font-family:inherit">🔧 ແກ້ໄປ</button>`:''}
+          </div>`:''}
         </div>`;
       }).join('');
 }
@@ -665,6 +732,7 @@ async function submitUpdate(taskId) {
   toast('✅ ບັນທຶກ update ສຳເລັດ!');
   await loadComments(taskId);
   await loadTasks();
+  await loadAllCommentPreviews();
 }
 
 // ── ADVANCED SEARCH helpers ───────────────────────
@@ -865,6 +933,7 @@ async function loadTasks() {
   allTasks = data||[];
   renderTasks();
   renderBlockers();
+  setTimeout(loadAllCommentPreviews, 100);
 }
 
 function getDueInfo(due_date, status) {
@@ -911,7 +980,8 @@ function renderTasks() {
             <span class="badge ${t.status==='done'?'done-b':t.status==='blocked'?'blocked':'inprogress'}">${{done:'ສຳເລັດ',inprogress:'ດຳເນີນຢູ່',blocked:'ຕິດຂັດ'}[t.status]||t.status}</span>
           </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c2)'}"></div></div>
-          ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">💬 ${t.notes}</div>`:''}
+          ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">📝 ${t.notes}</div>`:''}
+          <div id="comment-preview-${t.id}" style="margin-top:4px"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;color:var(--muted)">${t.progress}%</span>
