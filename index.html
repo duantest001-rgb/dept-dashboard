@@ -123,6 +123,22 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 .bar-col{display:flex;flex-direction:column;align-items:center;flex:1;gap:4px}
 .bar-fill{border-radius:4px 4px 0 0;width:100%}
 .bar-lbl{font-size:10px;color:var(--muted)}.bar-val{font-size:11px;font-weight:600;color:var(--muted)}
+.comment-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.comment-item:last-child{border-bottom:none}
+.comment-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.comment-avatar{width:24px;height:24px;border-radius:50%;background:#E6F1FB;color:#185FA5;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0}
+.comment-meta{font-size:11px;color:var(--muted)}
+.comment-body{font-size:13px;color:var(--text);padding-left:32px}
+.log-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.log-item:last-child{border-bottom:none}
+.log-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.role-badge{padding:2px 9px;border-radius:10px;font-size:11px;font-weight:600}
+.role-admin{background:#FAECE7;color:#993C1D}
+.role-manager{background:#FAEEDA;color:#854F0B}
+.role-employee{background:#E6F1FB;color:#185FA5}
+.role-viewer{background:#F1EFE8;color:#5F5E5A}
+.search-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
+.search-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}
 
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none}
@@ -189,6 +205,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
     <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ປະຊຸມ</button>
     <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
+    <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
   </nav>
 
   <!-- ── OVERVIEW ── -->
@@ -216,11 +233,43 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   <div class="page" id="page-tasks">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ທັງໝົດ <strong id="taskCount" style="color:var(--text)">—</strong> ລາຍການ</span>
-      <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn-outline" onclick="exportCSV()" style="font-size:12px"><i class="ti ti-download"></i> CSV</button>
+        <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
+      </div>
     </div>
-    <div style="position:relative;margin-bottom:10px">
-      <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
-      <input type="text" id="taskSearch" placeholder="ຄົ້ນຫາຊື່ວຽກ ຫຼື ຜູ້ຮັບຜິດຊອບ..." oninput="renderTasks()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+    <div class="search-panel">
+      <div style="position:relative">
+        <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
+        <input type="text" id="taskSearch" placeholder="ຄົ້ນຫາຊື່ວຽກ ຫຼື ຜູ້ຮັບຜິດຊອບ..." oninput="renderTasks()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+      </div>
+      <div class="search-grid">
+        <div class="form-row" style="margin-bottom:0"><label>ຜູ້ຮັບຜິດຊອບ</label>
+          <input type="text" id="sOwner" placeholder="ຊື່ຄົນ..." oninput="renderTasks()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ສະຖານະ</label>
+          <select id="sStatus" onchange="renderTasks()" style="font-size:12px;padding:5px 8px">
+            <option value="">ທັງໝົດ</option>
+            <option value="inprogress">ດຳເນີນ</option>
+            <option value="blocked">ຕິດຂັດ</option>
+            <option value="done">ສຳເລັດ</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ຄວາມສຳຄັນ</label>
+          <select id="sPriority" onchange="renderTasks()" style="font-size:12px;padding:5px 8px">
+            <option value="">ທັງໝົດ</option>
+            <option value="urgent">ດ່ວນ</option>
+            <option value="normal">ປົກກະຕິ</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>Due ກ່ອນ</label>
+          <input type="date" id="sDueBefore" onchange="renderTasks()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>&nbsp;</label>
+          <button onclick="clearSearch()" style="font-size:12px;padding:5px 10px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit;width:100%"><i class="ti ti-x"></i> ລ້າງ</button>
+        </div>
+      </div>
     </div>
     <div class="filter-btns">
       <button class="active" onclick="setFilter('all',this)">ທັງໝົດ</button>
@@ -335,6 +384,20 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     </div>
   </div>
 
+  <!-- ── ACTIVITY LOG ── -->
+  <div class="page" id="page-log">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:13px;color:var(--muted)">ປະຫວັດການດຳເນີນງານ</span>
+      <select id="logFilter" onchange="loadLog()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+        <option value="">ທັງໝົດ</option>
+        <option value="task">Task</option>
+        <option value="document">Document</option>
+        <option value="meeting">Meeting</option>
+      </select>
+    </div>
+    <div class="card"><div id="logList"><div class="spinner">ໂຫຼດ...</div></div></div>
+  </div>
+
   <!-- ── REPORT ── -->
   <div class="page" id="page-report">
     <div class="metrics" id="reportMetrics"><div class="spinner">ໂຫຼດ...</div></div>
@@ -369,6 +432,135 @@ const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = supabase;
 let db;
 
+// ── ROLE helpers ─────────────────────────────────
+let currentUser = null;
+let currentRole = 'employee';
+
+async function loadUserProfile() {
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return;
+  currentUser = user;
+  const { data } = await db.from('profiles').select('*').eq('id', user.id).single();
+  if (data) {
+    currentRole = data.role;
+    const roleName = {admin:'Admin',manager:'ຫົວໜ້າ',employee:'ພະນັກງານ',viewer:'Viewer'}[data.role]||data.role;
+    document.getElementById('userEmail').textContent = `${user.email} (${roleName})`;
+  }
+}
+
+function canEdit() { return ['admin','manager','employee'].includes(currentRole); }
+function canDelete() { return ['admin','manager'].includes(currentRole); }
+function canAdmin() { return currentRole === 'admin'; }
+
+// ── ACTIVITY LOG ──────────────────────────────────
+async function logAction(action, target_type, target_id, target_name, detail='') {
+  if (!currentUser) return;
+  await db.from('activity_log').insert({
+    user_id: currentUser.id,
+    user_email: currentUser.email,
+    action, target_type, target_id, target_name, detail
+  });
+}
+
+async function loadLog() {
+  const filter = document.getElementById('logFilter')?.value || '';
+  let q = db.from('activity_log').select('*').order('created_at', {ascending:false}).limit(100);
+  if (filter) q = q.eq('target_type', filter);
+  const { data } = await q;
+  const list = data || [];
+  const icons = {created:'➕',updated:'✏️',deleted:'🗑️',approved:'✅',commented:'💬'};
+  const colors = {created:'#E1F5EE',updated:'#E6F1FB',deleted:'#FAECE7',approved:'#EAF3DE',commented:'#EEEDFE'};
+  document.getElementById('logList').innerHTML = list.length === 0
+    ? '<div class="empty">ບໍ່ມີ activity</div>'
+    : list.map(l => {
+        const dt = new Date(l.created_at).toLocaleString('lo-LA');
+        return `<div class="log-item">
+          <div class="log-icon" style="background:${colors[l.action]||'#F1EFE8'}">${icons[l.action]||'•'}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;color:var(--text)"><strong>${l.user_email||'?'}</strong> ${l.action} <strong>${l.target_name||''}</strong></div>
+            ${l.detail?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${l.detail}</div>`:''}
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${dt} · ${l.target_type}</div>
+          </div>
+        </div>`;
+      }).join('');
+}
+
+// ── COMMENTS ─────────────────────────────────────
+async function toggleComments(taskId) {
+  const el = document.getElementById(`comments-${taskId}`);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    await loadComments(taskId);
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+async function loadComments(taskId) {
+  const { data } = await db.from('task_comments')
+    .select('*').eq('task_id', taskId).order('created_at');
+  const list = data || [];
+  const el = document.getElementById(`comment-list-${taskId}`);
+  if (!el) return;
+  el.innerHTML = list.length === 0
+    ? '<div style="font-size:12px;color:var(--muted);padding:4px 0">ຍັງບໍ່ມີ comment</div>'
+    : list.map(c => {
+        const initials = (c.user_email||'?').substring(0,2).toUpperCase();
+        const dt = new Date(c.created_at).toLocaleString('lo-LA');
+        return `<div class="comment-item">
+          <div class="comment-header">
+            <div class="comment-avatar">${initials}</div>
+            <span class="comment-meta">${c.user_email} · ${dt}</span>
+          </div>
+          <div class="comment-body">${c.body}</div>
+        </div>`;
+      }).join('');
+}
+
+async function addComment(taskId) {
+  const inp = document.getElementById(`comment-input-${taskId}`);
+  const body = inp?.value?.trim();
+  if (!body || !currentUser) return;
+  await db.from('task_comments').insert({
+    task_id: taskId,
+    user_id: currentUser.id,
+    user_email: currentUser.email,
+    body
+  });
+  inp.value = '';
+  await loadComments(taskId);
+  const task = allTasks.find(t => t.id === taskId);
+  await logAction('commented','task', taskId, task?.name||'', body.substring(0,80));
+}
+
+// ── ADVANCED SEARCH helpers ───────────────────────
+function clearSearch() {
+  ['taskSearch','sOwner','sStatus','sPriority','sDueBefore'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  renderTasks();
+}
+
+// ── EXPORT CSV ────────────────────────────────────
+function exportCSV() {
+  const headers = ['ID','ຊື່ວຽກ','ຜູ້ຮັບຜິດຊອບ','ກຳນົດສົ່ງ','ສະຖານະ','ຄວາມສຳຄັນ','ຄວາມຄືບໜ້າ%','ໝາຍເຫດ'];
+  const rows = allTasks.map(t => [
+    t.id, `"${t.name}"`, `"${t.owner}"`, t.due_date,
+    t.status, t.priority, t.progress, `"${t.notes||''}"`
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tasks_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('📥 Export CSV ສຳເລັດ!');
+}
+
 function initApp() {
   if (SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON')) {
     document.getElementById('config-warn').style.display = 'block';
@@ -395,6 +587,7 @@ function showApp(email) {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
   document.getElementById('userEmail').textContent = email;
+  loadUserProfile();
   document.getElementById('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   loadDash();
 }
@@ -453,7 +646,7 @@ function showPage(p, btn) {
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   if(btn) btn.classList.add('active');
-  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, report:loadReport};
+  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, report:loadReport, log:loadLog};
   if(map[p]) map[p]();
 }
 
@@ -558,6 +751,14 @@ function renderTasks() {
     : currentFilter==='urgent' ? allTasks.filter(t=>t.priority==='urgent')
     : allTasks.filter(t=>t.status===currentFilter);
   if (q) list = list.filter(t => t.name.toLowerCase().includes(q) || (t.owner||'').toLowerCase().includes(q));
+  const sOwner = (document.getElementById('sOwner')?.value||'').toLowerCase();
+  const sStatus = document.getElementById('sStatus')?.value||'';
+  const sPriority = document.getElementById('sPriority')?.value||'';
+  const sDueBefore = document.getElementById('sDueBefore')?.value||'';
+  if (sOwner) list = list.filter(t => (t.owner||'').toLowerCase().includes(sOwner));
+  if (sStatus) list = list.filter(t => t.status === sStatus);
+  if (sPriority) list = list.filter(t => t.priority === sPriority);
+  if (sDueBefore) list = list.filter(t => t.due_date && t.due_date !== '—' && t.due_date <= sDueBefore);
   document.getElementById('taskCount').textContent = list.length;
   document.getElementById('taskList').innerHTML = list.length===0
     ? '<div class="empty">ບໍ່ມີລາຍການ</div>'
@@ -584,7 +785,15 @@ function renderTasks() {
           <div style="display:flex;gap:4px">
             <button onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>
             <button onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>
+            <button onclick="toggleComments(${t.id})" style="border:1px solid var(--border);background:#eeedfe;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#534AB7" title="Comment"><i class="ti ti-message"></i></button>
           </div>
+        </div>
+      </div>
+      <div id="comments-${t.id}" style="display:none;padding:10px 12px 0 42px;border-top:1px solid var(--border);margin-top:4px">
+        <div id="comment-list-${t.id}"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="comment-input-${t.id}" placeholder="ຂຽນ comment..." style="flex:1;font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+          <button onclick="addComment(${t.id})" style="border:1px solid var(--border);background:var(--text);color:var(--bg);border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;font-family:inherit">ສົ່ງ</button>
         </div>
       </div>`;
     }).join('');
@@ -655,6 +864,8 @@ async function toggleDone(id, status) {
   const newStatus = status==='done' ? 'inprogress' : 'done';
   const newProg   = newStatus==='done' ? 100 : 80;
   await db.from('tasks').update({status:newStatus, progress:newProg}).eq('id',id);
+  const t = allTasks.find(x=>x.id===id);
+  await logAction(newStatus==='done'?'updated':'updated','task',id,t?.name||'',`status → ${newStatus}`);
   toast(newStatus==='done'?'✅ ໝາຍສຳເລັດ!':'↩️ ຍ້ອນກັບ');
   loadTasks();
 }
