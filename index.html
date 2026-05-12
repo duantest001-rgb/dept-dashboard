@@ -830,6 +830,8 @@ async function saveEditTask() {
     notes:document.getElementById('eNotes').value
   }).eq('id',id);
   if(error){toast('❌ '+error.message);return;}
+  await logAction('updated','task', id, document.getElementById('eName').value,
+    `status: ${document.getElementById('eStatus').value}, progress: ${document.getElementById('eProgress').value}%`);
   toast('✅ ແກ້ໄຂສຳເລັດ!');
   document.getElementById('editTaskForm').style.display='none';
   loadTasks();
@@ -837,8 +839,10 @@ async function saveEditTask() {
 
 async function deleteTask(id) {
   if(!confirm('ຢືນຢັນລຶບວຽກນີ້?')) return;
+  const task = allTasks.find(t=>t.id===id);
   const {error} = await db.from('tasks').delete().eq('id',id);
   if(error){toast('❌ '+error.message);return;}
+  await logAction('deleted','task', id, task?.name||'', `ຜູ້ຮັບຜິດຊອບ: ${task?.owner||'—'}`);
   toast('🗑️ ລຶບສຳເລັດ');
   loadTasks();
 }
@@ -875,14 +879,14 @@ async function saveTask() {
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກດ້ວຍ');return;}
   const btn = document.getElementById('saveTaskBtn');
   btn.disabled=true; btn.textContent='ກຳລັງບັນທຶກ...';
-  const {error} = await db.from('tasks').insert({
+  const {data, error} = await db.from('tasks').insert({
     name:n, owner:document.getElementById('tOwner').value||'—',
     due_date:document.getElementById('tDue').value||'—',
     priority:document.getElementById('tPri').value,
     status:document.getElementById('tStatus').value,
     notes:document.getElementById('tNotes').value,
     progress: document.getElementById('tStatus').value==='done'?100:0
-  });
+  }).select();
   btn.disabled=false; btn.textContent='💾 ບັນທຶກ';
   if(error){toast('❌ Error: '+error.message);return;}
   toast('✅ ເພີ່ມວຽກສຳເລັດ!');
@@ -926,15 +930,20 @@ function renderDocs() {
 
 async function advanceDoc(id, cur, total) {
   if(cur>=total-1) return;
+  const doc = allDocs.find(d=>d.id===id);
   await db.from('documents').update({current_step:cur+1}).eq('id',id);
+  const nextStep = (doc?.steps||[])[cur+1]||'';
+  await logAction('updated','document', id, doc?.name||'', `ຜ່ານຂັ້ນ → ${nextStep}`);
   toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
   loadDocs();
 }
 
 async function deleteDoc(id) {
   if(!confirm('ຢືນຢັນລຶບເອກະສານນີ້?')) return;
+  const doc = allDocs.find(d=>d.id===id);
   const {error} = await db.from('documents').delete().eq('id',id);
   if(error){toast('❌ '+error.message);return;}
+  await logAction('deleted','document', id, doc?.name||'', `ສ້າງໂດຍ: ${doc?.created_by||'—'}`);
   toast('🗑️ ລຶບສຳເລັດ');
   loadDocs();
 }
@@ -952,6 +961,8 @@ async function saveDoc() {
     steps:steps, current_step:0
   });
   if(error){toast('❌ '+error.message);return;}
+  await logAction('created','document', 0, document.getElementById('dName').value,
+    `ສ້າງໂດຍ: ${document.getElementById('dFrom').value} → ${document.getElementById('dTo').value}`);
   toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
   toggleForm('addDocForm');
   ['dName','dFrom','dTo'].forEach(id=>document.getElementById(id).value='');
@@ -983,8 +994,10 @@ async function loadMeet() {
 
 async function deleteMeet(id) {
   if(!confirm('ຢືນຢັນລຶບກອງປະຊຸມນີ້?')) return;
+  const meet = allMeets.find(m=>m.id===id);
   const {error} = await db.from('meetings').delete().eq('id',id);
   if(error){toast('❌ '+error.message);return;}
+  await logAction('deleted','meeting', id, meet?.title||'', `${meet?.meet_date||''} ${meet?.meet_time||''}`);
   toast('🗑️ ລຶບສຳເລັດ');
   loadMeet();
 }
@@ -1001,6 +1014,8 @@ async function saveMeet() {
     notes:document.getElementById('mNote').value, attendees:att
   });
   if(error){toast('❌ '+error.message);return;}
+  await logAction('created','meeting', 0, document.getElementById('mTitle').value,
+    `${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value}`);
   toast('✅ ນັດກອງປະຊຸມສຳເລັດ!');
   toggleForm('addMeetForm');
   ['mTitle','mLoc','mAtt','mNote'].forEach(id=>document.getElementById(id).value='');
