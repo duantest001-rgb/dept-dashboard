@@ -337,9 +337,40 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
   <!-- ── DOCUMENTS ── -->
   <div class="page" id="page-docs">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ຕິດຕາມເສັ້ນທາງເອກະສານ</span>
       <button class="btn-outline" onclick="toggleForm('addDocForm')"><i class="ti ti-plus"></i> ເພີ່ມເອກະສານ</button>
+    </div>
+    <div class="search-panel">
+      <div style="position:relative">
+        <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
+        <input type="text" id="docSearch" placeholder="ຄົ້ນຫາຊື່ເອກະສານ..." oninput="renderDocs()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+      </div>
+      <div class="search-grid">
+        <div class="form-row" style="margin-bottom:0"><label>ສ້າງໂດຍ</label>
+          <input type="text" id="dSearchFrom" placeholder="ຊື່ຜູ້ສ້າງ..." oninput="renderDocs()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ປະເພດ</label>
+          <select id="dSearchType" onchange="renderDocs()" style="font-size:12px;padding:5px 8px">
+            <option value="">ທັງໝົດ</option>
+            <option value="📄">📄 ບົດລາຍງານ</option>
+            <option value="📋">📋 ຂໍ້ສະເໜີ</option>
+            <option value="📑">📑 ສັນຍາ</option>
+            <option value="📊">📊 ງົບປະມານ</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ສະຖານະ</label>
+          <select id="dSearchStatus" onchange="renderDocs()" style="font-size:12px;padding:5px 8px">
+            <option value="">ທັງໝົດ</option>
+            <option value="pending">ລໍຖ້າ</option>
+            <option value="done">ອະນຸມັດແລ້ວ</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>&nbsp;</label>
+          <button onclick="clearDocSearch()" style="font-size:12px;padding:5px 10px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit;width:100%"><i class="ti ti-x"></i> ລ້າງ</button>
+        </div>
+      </div>
     </div>
     <div class="card"><div id="docList"><div class="spinner">ໂຫຼດ...</div></div></div>
     <div class="card" id="addDocForm" style="display:none">
@@ -362,9 +393,30 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
   <!-- ── MEETINGS ── -->
   <div class="page" id="page-meet">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ຕາຕະລາງກອງປະຊຸມ</span>
       <button class="btn-outline" onclick="toggleForm('addMeetForm')"><i class="ti ti-plus"></i> ນັດໃໝ່</button>
+    </div>
+    <div class="search-panel">
+      <div style="position:relative">
+        <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
+        <input type="text" id="meetSearch" placeholder="ຄົ້ນຫາຊື່ກອງປະຊຸມ..." oninput="renderMeet()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+      </div>
+      <div class="search-grid">
+        <div class="form-row" style="margin-bottom:0"><label>ວັນທີ ຈາກ</label>
+          <input type="date" id="mSearchFrom" onchange="renderMeet()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ວັນທີ ຮອດ</label>
+          <input type="date" id="mSearchTo" onchange="renderMeet()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0"><label>ສະຖານທີ</label>
+          <input type="text" id="mSearchLoc" placeholder="ຫ້ອງ / Online..." oninput="renderMeet()" style="font-size:12px;padding:5px 8px">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>&nbsp;</label>
+          <button onclick="clearMeetSearch()" style="font-size:12px;padding:5px 10px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit;width:100%"><i class="ti ti-x"></i> ລ້າງ</button>
+        </div>
+      </div>
     </div>
     <div class="card"><div id="meetList"><div class="spinner">ໂຫຼດ...</div></div></div>
     <div class="card" id="addMeetForm" style="display:none">
@@ -1003,9 +1055,19 @@ async function loadDocs() {
 }
 
 function renderDocs() {
-  document.getElementById('docList').innerHTML = allDocs.length===0
-    ? '<div class="empty">ບໍ່ມີເອກະສານ</div>'
-    : allDocs.map(d=>{
+  const q        = (document.getElementById('docSearch')?.value||'').toLowerCase();
+  const fromQ    = (document.getElementById('dSearchFrom')?.value||'').toLowerCase();
+  const typeQ    = document.getElementById('dSearchType')?.value||'';
+  const statusQ  = document.getElementById('dSearchStatus')?.value||'';
+  let docs = allDocs;
+  if (q)       docs = docs.filter(d => d.name.toLowerCase().includes(q));
+  if (fromQ)   docs = docs.filter(d => (d.created_by||'').toLowerCase().includes(fromQ));
+  if (typeQ)   docs = docs.filter(d => d.doc_type === typeQ);
+  if (statusQ === 'done')    docs = docs.filter(d => d.current_step >= (d.steps||[]).length-1);
+  if (statusQ === 'pending') docs = docs.filter(d => d.current_step < (d.steps||[]).length-1);
+  document.getElementById('docList').innerHTML = docs.length===0
+    ? '<div class="empty">ບໍ່ພົບເອກະສານ</div>'
+    : docs.map(d=>{
       const steps = d.steps||[];
       const stepsHtml = steps.map((s,i)=>{
         const cls = i<d.current_step?'done':i===d.current_step?'current':'wait';
@@ -1073,9 +1135,22 @@ async function saveDoc() {
 async function loadMeet() {
   const {data} = await db.from('meetings').select('*').order('meet_date');
   allMeets = data||[];
-  document.getElementById('meetList').innerHTML = allMeets.length===0
-    ? '<div class="empty">ບໍ່ມີກອງປະຊຸມ</div>'
-    : allMeets.map(m=>{
+  renderMeet();
+}
+
+function renderMeet() {
+  const q       = (document.getElementById('meetSearch')?.value||'').toLowerCase();
+  const fromD   = document.getElementById('mSearchFrom')?.value||'';
+  const toD     = document.getElementById('mSearchTo')?.value||'';
+  const locQ    = (document.getElementById('mSearchLoc')?.value||'').toLowerCase();
+  let meets = allMeets;
+  if (q)     meets = meets.filter(m => m.title.toLowerCase().includes(q));
+  if (fromD) meets = meets.filter(m => m.meet_date >= fromD);
+  if (toD)   meets = meets.filter(m => m.meet_date <= toD);
+  if (locQ)  meets = meets.filter(m => (m.location||'').toLowerCase().includes(locQ));
+  document.getElementById('meetList').innerHTML = meets.length===0
+    ? '<div class="empty">ບໍ່ພົບກອງປະຊຸມ</div>'
+    : meets.map(m=>{
       const att = m.attendees||[];
       const avatars = att.map((a,i)=>`<div class="avatar" style="background:${acBg[i%5]};color:${acText[i%5]}">${a}</div>`).join('');
       return `<div class="meeting-item">
@@ -1100,6 +1175,18 @@ async function deleteMeet(id) {
   await logAction('deleted','meeting', id, meet?.title||'', `${meet?.meet_date||''} ${meet?.meet_time||''}`);
   toast('🗑️ ລຶບສຳເລັດ');
   loadMeet();
+}
+
+function clearDocSearch() {
+  ['docSearch','dSearchFrom'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const dt=document.getElementById('dSearchType'); if(dt) dt.value='';
+  const ds=document.getElementById('dSearchStatus'); if(ds) ds.value='';
+  renderDocs();
+}
+
+function clearMeetSearch() {
+  ['meetSearch','mSearchFrom','mSearchTo','mSearchLoc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderMeet();
 }
 
 async function saveMeet() {
