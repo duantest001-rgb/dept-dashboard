@@ -405,6 +405,23 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <button class="btn-outline" onclick="toggleForm('addDocForm')">ຍົກເລີກ</button>
       </div>
     </div>
+    <div class="card" id="editDocForm" style="display:none">
+      <div class="card-title"><i class="ti ti-file-pencil" style="color:var(--c2)"></i> ແກ້ໄຂເອກະສານ</div>
+      <input type="hidden" id="editDocId">
+      <div class="form-row"><label>ຊື່ເອກະສານ *</label><input type="text" id="eDName" placeholder="ຊື່ເອກະສານ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ປະເພດ</label>
+          <select id="eDType"><option>📄 ບົດລາຍງານ</option><option>📋 ຂໍ້ສະເໜີ</option><option>📑 ສັນຍາ</option><option>📊 ງົບປະມານ</option></select>
+        </div>
+        <div class="form-row"><label>ສ້າງໂດຍ</label><input type="text" id="eDFrom" placeholder="ຊື່ຜູ້ສ້າງ..."></div>
+      </div>
+      <div class="form-row"><label>ສ່ົງຫາ</label><input type="text" id="eDTo" placeholder="ຊື່ຜູ້ຮັບ..."></div>
+      <div class="form-row"><label>ຂັ້ນຕອນ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eDSteps" placeholder="ສ້າງ,ກວດ,ໜ.ພ.,CFO,ອະນຸມັດ"></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveEditDoc()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-outline" onclick="document.getElementById('editDocForm').style.display='none'">ຍົກເລີກ</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── MEETINGS ── -->
@@ -1239,7 +1256,8 @@ function renderDocs() {
           <div class="flow-steps">${stepsHtml}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             ${!isDone?`<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
-            <button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+            ${canEdit()?`<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
+            ${canDelete()?`<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
           </div>
         </div>
       </div>`;
@@ -1253,6 +1271,42 @@ async function advanceDoc(id, cur, total) {
   const nextStep = (doc?.steps||[])[cur+1]||'';
   await logAction('updated','document', id, doc?.name||'', `ຜ່ານຂັ້ນ → ${nextStep}`);
   toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  loadDocs();
+}
+
+function openEditDoc(id) {
+  const d = allDocs.find(x=>x.id===id);
+  if(!d) return;
+  document.getElementById('editDocId').value = id;
+  document.getElementById('eDName').value = d.name;
+  document.getElementById('eDFrom').value = d.created_by||'';
+  document.getElementById('eDTo').value   = d.sent_to||'';
+  document.getElementById('eDSteps').value = (d.steps||[]).join(',');
+  const sel = document.getElementById('eDType');
+  const tp = d.doc_type||'📄';
+  for(let i=0;i<sel.options.length;i++){
+    if(sel.options[i].value.startsWith(tp)){ sel.selectedIndex=i; break; }
+  }
+  const form = document.getElementById('editDocForm');
+  form.style.display = 'block';
+  form.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveEditDoc() {
+  const id = parseInt(document.getElementById('editDocId').value);
+  const n  = document.getElementById('eDName').value.trim();
+  if(!n){ toast('⚠️ ໃສ່ຊື່ເອກະສານ'); return; }
+  const tp    = document.getElementById('eDType').value.split(' ')[0];
+  const steps = document.getElementById('eDSteps').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const from  = document.getElementById('eDFrom').value||'—';
+  const to    = document.getElementById('eDTo').value||'—';
+  const {error} = await db.from('documents').update({
+    name:n, doc_type:tp, created_by:from, sent_to:to, steps:steps
+  }).eq('id',id);
+  if(error){ toast('❌ '+error.message); return; }
+  await logAction('updated','document', id, n, `${from} → ${to} | ຂັ້ນຕອນ: ${steps.join(',')}`);
+  toast('✅ ແກ້ໄຂເອກະສານສຳເລັດ!');
+  document.getElementById('editDocForm').style.display = 'none';
   loadDocs();
 }
 
