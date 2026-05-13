@@ -226,7 +226,23 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div class="card-title"><i class="ti ti-calendar" style="color:var(--c2)"></i> ກອງປະຊຸມໃກ້ຮອດ</div>
       <div id="meetPreview"><div class="spinner">ໂຫຼດ...</div></div>
     </div>
-    <div id="announceArea"></div>
+    <div class="card" style="margin-top:12px">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span><i class="ti ti-speakerphone" style="color:var(--c1)"></i> ປະກາດ</span>
+        <button id="addAnnBtn" onclick="toggleForm('addAnnForm')" style="display:none;font-size:11px;padding:4px 10px;border:1px solid var(--c1);color:var(--c1m);background:var(--c1l);border-radius:6px;cursor:pointer"><i class="ti ti-plus"></i> ເພີ່ມປະກາດ</button>
+      </div>
+      <div id="addAnnForm" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg2);border-radius:var(--radius);border:1px solid var(--border)">
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:4px">ຂໍ້ຄວາມປະກາດ</label>
+          <textarea id="annMsg" rows="2" placeholder="ພິມຂໍ້ຄວາມ..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="saveAnnouncement()" style="flex:1;padding:7px;background:var(--c1);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">📢 ໂພສປະກາດ</button>
+          <button onclick="toggleForm('addAnnForm')" style="padding:7px 14px;border:1px solid var(--border);background:var(--bg);border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)">ຍົກເລີກ</button>
+        </div>
+      </div>
+      <div id="announceArea"></div>
+    </div>
   </div>
 
   <!-- ── TASKS ── -->
@@ -867,6 +883,32 @@ function toast(msg) {
 const acBg  =['#E1F5EE','#E6F1FB','#FAEEDA','#EEEDFE','#FAECE7'];
 const acText=['#0F6E56','#185FA5','#854F0B','#534AB7','#993C1D'];
 
+// ════ ANNOUNCEMENTS ════
+async function saveAnnouncement() {
+  const msg = document.getElementById('annMsg').value.trim();
+  if (!msg) { toast('⚠️ ໃສ່ຂໍ້ຄວາມກ່ອນ'); return; }
+  const { data: { user } } = await db.auth.getUser();
+  const { error } = await db.from('announcements').insert({
+    message: msg,
+    author: user?.email?.split('@')[0] || 'Admin'
+  });
+  if (error) { toast('❌ ' + error.message); return; }
+  await logAction('created', 'announcement', 0, msg.substring(0, 40), '');
+  toast('✅ ໂພສປະກາດສຳເລັດ!');
+  document.getElementById('annMsg').value = '';
+  toggleForm('addAnnForm');
+  loadDash();
+}
+
+async function deleteAnnouncement(id) {
+  if (!confirm('ຢືນຢັນລຶບປະກາດນີ້?')) return;
+  const { error } = await db.from('announcements').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+  await logAction('deleted', 'announcement', id, 'ປະກາດ #' + id, '');
+  toast('🗑️ ລຶບປະກາດສຳເລັດ');
+  loadDash();
+}
+
 // ════ DASHBOARD ════
 async function loadDash() {
   const [tasksRes, docsRes, meetsRes, annRes] = await Promise.all([
@@ -920,10 +962,22 @@ async function loadDash() {
       </div>`).join('');
 
   const anns = annRes.data||[];
-  document.getElementById('announceArea').innerHTML = anns.map(a=>`
-    <div class="announce">
-      <span style="font-size:22px">📢</span>
-      <div class="announce-text"><strong>${a.message}</strong><span>ໂດຍ ${a.author}</span></div>
+  if (canAdmin()) {
+    const btn = document.getElementById('addAnnBtn');
+    if (btn) btn.style.display = 'inline-block';
+  }
+  document.getElementById('announceArea').innerHTML = anns.length === 0
+    ? '<div class="empty" style="font-size:13px;color:var(--muted);padding:8px 0">ຍັງບໍ່ມີປະກາດ</div>'
+    : anns.map(a=>`
+    <div class="announce" style="justify-content:space-between">
+      <div style="display:flex;gap:12px;align-items:center;flex:1;min-width:0">
+        <span style="font-size:22px">📢</span>
+        <div class="announce-text">
+          <strong>${a.message}</strong>
+          <span>ໂດຍ ${a.author} · ${new Date(a.created_at).toLocaleDateString('lo-LA')}</span>
+        </div>
+      </div>
+      ${canAdmin()?`<button onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
     </div>`).join('');
 }
 
