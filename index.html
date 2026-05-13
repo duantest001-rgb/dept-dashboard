@@ -1287,12 +1287,16 @@ async function loadDash() {
         <br><span style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${(d.steps||[])[d.current_step]||'—'}</span>
       </div>`).join('');
 
-  const next2 = [...allMeets].sort((a,b)=>a.meet_date+a.meet_time>b.meet_date+b.meet_time?1:-1).slice(0,2);
+  const next2 = [...allMeets].sort((a,b)=>{
+    const ad = (a.meet_date||'9999')+(a.meet_time||'');
+    const bd = (b.meet_date||'9999')+(b.meet_time||'');
+    return ad > bd ? 1 : -1;
+  }).slice(0,2);
   document.getElementById('meetPreview').innerHTML = next2.length===0
     ? '<div class="empty">ບໍ່ມີກອງປະຊຸມ</div>'
     : next2.map(m=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
         <i class="ti ti-calendar-event" style="color:var(--c2);font-size:13px"></i> <strong>${m.title}</strong>
-        <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date} ${m.meet_time} · ${m.location}</span>
+        <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date||'ບໍ່ກຳນົດ'} ${m.meet_time||''} · ${m.location}</span>
       </div>`).join('');
 
   const anns = annRes.data||[];
@@ -1325,7 +1329,7 @@ async function loadTasks() {
 }
 
 function getDueInfo(due_date, status) {
-  if (status === 'done' || !due_date || due_date === '—') return {label: due_date, cls: '', tag: ''};
+  if (status === 'done' || !due_date || due_date === '—') return {label: due_date||'ບໍ່ກຳນົດ', cls: 'color:var(--muted)', tag: ''};
   const today = new Date(); today.setHours(0,0,0,0);
   const due = new Date(due_date); due.setHours(0,0,0,0);
   const diff = Math.ceil((due - today) / (1000*60*60*24));
@@ -1467,7 +1471,7 @@ async function saveEditTask() {
   const {error} = await db.from('tasks').update({
     name:n,
     owner:document.getElementById('eOwner').value||'—',
-    due_date:document.getElementById('eDue').value||'—',
+    due_date:document.getElementById('eDue').value||null,
     priority:document.getElementById('ePri').value,
     status:document.getElementById('eStatus').value,
     progress:parseInt(document.getElementById('eProgress').value),
@@ -1528,7 +1532,7 @@ async function saveTask() {
   const owner = ownerRaw || myEmailPrefix() || '—';
   const {data, error} = await db.from('tasks').insert({
     name:n, owner,
-    due_date:document.getElementById('tDue').value||'—',
+    due_date:document.getElementById('tDue').value||null,
     priority:document.getElementById('tPri').value,
     status:document.getElementById('tStatus').value,
     notes:document.getElementById('tNotes').value,
@@ -1686,8 +1690,8 @@ function renderMeet() {
   };
   let meets = allMeets;
   if (q)     meets = meets.filter(m => m.title.toLowerCase().includes(q));
-  if (fromD) meets = meets.filter(m => m.meet_date >= fromD);
-  if (toD)   meets = meets.filter(m => m.meet_date <= toD);
+  if (fromD) meets = meets.filter(m => m.meet_date && m.meet_date >= fromD);
+  if (toD)   meets = meets.filter(m => m.meet_date && m.meet_date <= toD);
   if (locQ)  meets = meets.filter(m => (m.location||'').toLowerCase().includes(locQ));
   if (typeQ) meets = meets.filter(m => (m.meet_type||'ກອງປະຊຸມ') === typeQ);
   document.getElementById('meetList').innerHTML = meets.length===0
@@ -1698,7 +1702,7 @@ function renderMeet() {
       const tp = m.meet_type||'ກອງປະຊຸມ';
       const tm = typeMap[tp]||{icon:'📅', bg:'#F1EFE8', color:'#5F5E5A'};
       return `<div class="meeting-item">
-        <div class="meet-date"><div class="md">${m.meet_date.slice(5)}</div><div class="mt">${m.meet_time}</div></div>
+        <div class="meet-date"><div class="md">${m.meet_date ? m.meet_date.slice(5) : '—'}</div><div class="mt">${m.meet_time||'—'}</div></div>
         <div class="meet-info">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
             <span style="background:${tm.bg};color:${tm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${tm.icon} ${tp}</span>
@@ -1740,8 +1744,8 @@ async function saveEditMeet() {
   const {error} = await db.from('meetings').update({
     title:t,
     meet_type: tp,
-    meet_date: document.getElementById('eMDate').value||'—',
-    meet_time: document.getElementById('eMTime').value||'—',
+    meet_date: document.getElementById('eMDate').value||null,
+    meet_time: document.getElementById('eMTime').value||null,
     location:  document.getElementById('eMLoc').value||'ຫ້ອງປະຊຸມ',
     notes:     document.getElementById('eMNote').value,
     attendees: att
@@ -1783,8 +1787,8 @@ async function saveMeet() {
   const att = rawAtt.split(',').map(s=>s.trim()).filter(Boolean);
   const tp = document.getElementById('mType').value;
   const {error} = await db.from('meetings').insert({
-    title:t, meet_date:document.getElementById('mDate').value||'—',
-    meet_time:document.getElementById('mTime').value||'—',
+    title:t, meet_date:document.getElementById('mDate').value||null,
+    meet_time:document.getElementById('mTime').value||null,
     location:document.getElementById('mLoc').value||'ຫ້ອງປະຊຸມ',
     notes:document.getElementById('mNote').value, attendees:att,
     meet_type: tp
