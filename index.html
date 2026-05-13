@@ -675,6 +675,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
       <div id="dhTimeline"></div>
+      <div id="dhFooter" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
     </div>
   </div>
 
@@ -1692,6 +1693,8 @@ function renderDocs() {
             <button onclick="openDocHistory(${d.id})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)"><i class="ti ti-history"></i> History</button>
             ${!isDone && !isCancelled && isSuperior()
               ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
+            ${!isCancelled && canAdmin() && d.current_step > 0
+              ? `<button onclick="revertDoc(${d.id},${d.current_step})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)" title="ຍ້ອນກັບຂັ້ນກ່ອນໜ້າ">◀ ຍ້ອນກັບ</button>` : ''}
             ${!isCancelled && isSuperior()
               ? `<button onclick="cancelDoc(${d.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-ban"></i> ຍົກເລີກ</button>` : ''}
             ${isCancelled && isSuperior()
@@ -1783,6 +1786,14 @@ function openDocHistory(docId) {
 
   document.getElementById('dhTimeline').innerHTML = html;
   document.getElementById('docHistoryModal').style.display = 'flex';
+
+  // ໃສ່ revert button ໃນ modal footer ຖ້າ admin + cur > 0
+  const footerEl = document.getElementById('dhFooter');
+  if (footerEl) {
+    footerEl.innerHTML = !isCancelled && canAdmin() && d.current_step > 0
+      ? `<button onclick="closeDocHistory();revertDoc(${docId},${d.current_step})" style="font-size:12px;padding:5px 14px;border:1px solid var(--border);background:var(--bg2);border-radius:6px;cursor:pointer;color:var(--muted);font-family:inherit">◀ ຍ້ອນຂັ້ນກ່ອນໜ້າ</button>`
+      : '';
+  }
 }
 
 function closeDocHistory() {
@@ -1837,6 +1848,20 @@ async function advanceDoc(id, cur, total) {
   const nextStep = (doc?.steps||[])[cur+1]||'';
   await logAction('updated','document', id, doc?.name||'', `ຜ່ານຂັ້ນ → ${nextStep}`);
   toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  loadDocs();
+}
+
+async function revertDoc(id, cur) {
+  if (cur <= 0) { toast('⚠️ ຢູ່ຂັ້ນທຳອິດແລ້ວ'); return; }
+  if (!confirm('ຢືນຢັນຍ້ອນກັບຂັ້ນກ່ອນໜ້າ?')) return;
+  const doc = allDocs.find(d=>d.id===id);
+  const prevStep = (doc?.steps||[])[cur-1]||'';
+  await db.from('documents').update({
+    current_step: cur-1,
+    doc_status: 'inprogress'
+  }).eq('id',id);
+  await logAction('updated','document', id, doc?.name||'', `◀ ຍ້ອນກັບຂັ້ນ → ${prevStep}`);
+  toast('◀ ຍ້ອນກັບຂັ້ນກ່ອນໜ້າແລ້ວ');
   loadDocs();
 }
 
