@@ -662,6 +662,22 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     </div>
   </div>
 
+  <!-- ── DOC HISTORY MODAL ── -->
+  <div id="docHistoryModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:998;align-items:center;justify-content:center">
+    <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:min(480px,92vw);max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+      <button onclick="closeDocHistory()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+      <div style="margin-bottom:14px">
+        <div style="font-size:15px;font-weight:600;color:var(--text);padding-right:24px" id="dhTitle"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+          <span id="dhStatus" style="font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px"></span>
+          <span id="dhMeta" style="font-size:11px;color:var(--muted)"></span>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
+      <div id="dhTimeline"></div>
+    </div>
+  </div>
+
   <!-- ── STEP COMMENT MODAL ── -->
   <div id="stepCommentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
     <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:min(380px,90vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
@@ -1641,6 +1657,7 @@ function renderDocs() {
       const docStatus   = d.doc_status || (isDone ? 'done' : 'inprogress');
       const stepComments = d.step_comments || {};
 
+      const canStepComment = isSuperior() || myEmailPrefix() === (d.created_by||'');
       const stepsHtml = steps.map((s,i)=>{
         const done    = i < d.current_step || isDone;
         const current = i === d.current_step && !isDone && !isCancelled;
@@ -1649,12 +1666,9 @@ function renderDocs() {
           ? `<div class="fstep-line" style="background:${done?'var(--c1)':'var(--border)'}"></div>` : '';
         const coms    = stepComments[i] || [];
         const comBadge = coms.length > 0
-          ? `<div style="font-size:9px;background:#E6F1FB;color:#185FA5;border-radius:8px;padding:1px 5px;margin-top:2px;cursor:pointer" onclick="toggleStepComments(${d.id},${i})">💬 ${coms.length}</div>` : '';
-        const comBtn = `<div style="font-size:9px;color:var(--muted);margin-top:2px;cursor:pointer;text-decoration:underline" onclick="openStepComment(${d.id},${i},\`${s}\`)">+ comment</div>`;
-        const comLog = coms.length > 0
-          ? `<div id="stepcom-${d.id}-${i}" style="display:none;margin-top:4px;padding:4px 6px;background:var(--bg2);border-radius:5px;border:1px solid var(--border);min-width:120px">
-              ${coms.map(cm=>`<div style="font-size:10px;padding:2px 0;border-bottom:1px solid var(--border)"><strong>${cm.by}</strong>: ${cm.text} <span style="opacity:.5;font-size:9px">${cm.at}</span></div>`).join('')}
-            </div>` : '';
+          ? `<div style="font-size:9px;background:#E6F1FB;color:#185FA5;border-radius:8px;padding:1px 5px;margin-top:2px;cursor:pointer;font-weight:500" onclick="openDocHistory(${d.id})" title="ກົດເບິ່ງ history">💬 ${coms.length}</div>` : '';
+        const comBtn = canStepComment
+          ? `<div style="font-size:9px;color:var(--c2m);margin-top:2px;cursor:pointer;text-decoration:underline" onclick="openStepComment(${d.id},${i},\`${s}\`)">+ comment</div>` : '';
         return `<div class="fstep-wrap">
           <div class="fstep ${cls}">
             <div class="fstep-circle">${done?'✓':i+1}</div>
@@ -1662,7 +1676,6 @@ function renderDocs() {
             ${comBadge}
             ${comBtn}
           </div>
-          ${comLog}
           ${line}
         </div>`;
       }).join('');
@@ -1676,6 +1689,7 @@ function renderDocs() {
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
           <div class="flow-steps">${stepsHtml}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button onclick="openDocHistory(${d.id})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)"><i class="ti ti-history"></i> History</button>
             ${!isDone && !isCancelled && isSuperior()
               ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
             ${!isCancelled && isSuperior()
@@ -1715,6 +1729,66 @@ function toggleStepComments(docId, stepIdx) {
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
+function openDocHistory(docId) {
+  const d = allDocs.find(x=>x.id===docId);
+  if (!d) return;
+  const steps = d.steps||[];
+  const stepComments = d.step_comments||{};
+  const isDone      = d.doc_status==='done' || d.current_step>=steps.length-1;
+  const isCancelled = d.doc_status==='cancelled';
+  const docStatus   = d.doc_status||(isDone?'done':'inprogress');
+  const statusLabel = {done:'✅ ສຳເລັດ', cancelled:'🚫 ຍົກເລີກ', inprogress:'🔄 ດຳເນີນຢູ່'}[docStatus]||'';
+  const statusColor = {done:'#D4EDDA', cancelled:'#F8D7DA', inprogress:'#FFF3CD'}[docStatus]||'#FFF3CD';
+
+  document.getElementById('dhTitle').textContent = d.name;
+  document.getElementById('dhStatus').textContent = statusLabel;
+  document.getElementById('dhStatus').style.background = statusColor;
+  document.getElementById('dhMeta').textContent = `ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}`;
+
+  // Build timeline
+  let html = '';
+  steps.forEach((s,i) => {
+    const done    = i < d.current_step || isDone;
+    const current = i === d.current_step && !isDone && !isCancelled;
+    const coms    = stepComments[i]||[];
+    const stepColor = done ? '#0F6E56' : current ? '#185FA5' : '#999';
+    const stepBg   = done ? '#E1F5EE' : current ? '#E6F1FB' : '#F1EFE8';
+    const canStepComment = isSuperior() || myEmailPrefix()===(d.created_by||'');
+
+    html += `<div style="display:flex;gap:12px;margin-bottom:16px">
+      <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+        <div style="width:30px;height:30px;border-radius:50%;background:${stepBg};color:${stepColor};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:2px solid ${stepColor}">
+          ${done?'✓':i+1}
+        </div>
+        ${i<steps.length-1?`<div style="width:2px;flex:1;background:${done?'var(--c1)':'var(--border)'};margin-top:4px;min-height:20px"></div>`:''}
+      </div>
+      <div style="flex:1;min-width:0;padding-bottom:8px">
+        <div style="font-size:13px;font-weight:500;color:${stepColor};margin-bottom:4px">
+          ${s} ${current?'<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:8px">ຂັ້ນຕໍ່ໄປ</span>':''}
+        </div>
+        ${coms.length===0
+          ? `<div style="font-size:11px;color:var(--muted);font-style:italic">ຍັງບໍ່ມີ comment</div>`
+          : coms.map(cm=>`
+            <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;margin-bottom:5px">
+              <div style="font-size:12px;color:var(--text);margin-bottom:2px">${cm.text}</div>
+              <div style="font-size:10px;color:var(--muted)"><strong>${cm.by}</strong> · ${cm.at}</div>
+            </div>`).join('')
+        }
+        ${canStepComment ? `<div style="margin-top:4px">
+          <button onclick="closeDocHistory();openStepComment(${docId},${i},\`${s}\`)" style="font-size:11px;padding:3px 10px;border:1px dashed var(--border);background:transparent;border-radius:6px;cursor:pointer;color:var(--muted);font-family:inherit">+ ເພີ່ມ comment</button>
+        </div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('dhTimeline').innerHTML = html;
+  document.getElementById('docHistoryModal').style.display = 'flex';
+}
+
+function closeDocHistory() {
+  document.getElementById('docHistoryModal').style.display = 'none';
+}
+
 function openStepComment(docId, stepIdx, stepName) {
   document.getElementById('scDocId').value   = docId;
   document.getElementById('scStepIdx').value = stepIdx;
@@ -1751,7 +1825,9 @@ async function saveStepComment() {
   await logAction('commented','document', docId, `ຂັ້ນ ${stepIdx+1}`, text);
   toast('💬 ບັນທຶກ comment ແລ້ວ!');
   closeStepComment();
-  loadDocs();
+  await loadDocs();
+  // refresh history modal ຖ້າຍັງເປີດຢູ່
+  if (document.getElementById('docHistoryModal').style.display === 'flex') openDocHistory(docId);
 }
 
 async function advanceDoc(id, cur, total) {
