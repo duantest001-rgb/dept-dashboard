@@ -330,7 +330,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div class="card-title"><i class="ti ti-plus-circle"></i> ເພີ່ມໜ້າວຽກໃໝ່</div>
       <div class="form-row"><label>ຊື່ວຽກ *</label><input type="text" id="tName" placeholder="ຊື່ວຽກ..."></div>
       <div class="row2">
-        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label><input type="text" id="tOwner" placeholder="ຊື່ຄົນ..."></div>
+        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label>
+          <select id="tOwner" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">-- ເລືອກ --</option>
+          </select>
+        </div>
         <div class="form-row"><label>ກຳນົດສ່ົງ</label><input type="date" id="tDue"></div>
       </div>
       <div class="row2">
@@ -353,7 +357,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <input type="hidden" id="editTaskId">
       <div class="form-row"><label>ຊື່ວຽກ *</label><input type="text" id="eName" placeholder="ຊື່ວຽກ..."></div>
       <div class="row2">
-        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label><input type="text" id="eOwner"></div>
+        <div class="form-row"><label>ຜູ້ຮັບຜິດຊອບ</label>
+          <select id="eOwner" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">-- ເລືອກ --</option>
+          </select>
+        </div>
         <div class="form-row"><label>ກຳນົດສ່ົງ</label><input type="date" id="eDue"></div>
       </div>
       <div class="row2">
@@ -426,7 +434,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row"><label>ປະເພດ</label>
           <select id="dType"><option>📄 ບົດລາຍງານ</option><option>📋 ຂໍ້ສະເໜີ</option><option>📑 ສັນຍາ</option><option>📊 ງົບປະມານ</option></select>
         </div>
-        <div class="form-row"><label>ສ້າງໂດຍ</label><input type="text" id="dFrom" placeholder="ຊື່ຜູ້ສ້າງ..."></div>
+        <div class="form-row"><label>ສ້າງໂດຍ</label>
+          <select id="dFrom" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">-- ເລືອກ --</option>
+          </select>
+        </div>
       </div>
       <div class="form-row"><label>ສ່ົງຫາ</label><input type="text" id="dTo" placeholder="ຊື່ຜູ້ຮັບ..."></div>
       <div class="form-row"><label>ຂັ້ນຕອນ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="dSteps" value="ສ້າງ,ກວດ,ອະນຸມັດ" placeholder="ສ້າງ,ກວດ,ໜ.ພ.,CFO,ອະນຸມັດ"></div>
@@ -443,7 +455,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row"><label>ປະເພດ</label>
           <select id="eDType"><option>📄 ບົດລາຍງານ</option><option>📋 ຂໍ້ສະເໜີ</option><option>📑 ສັນຍາ</option><option>📊 ງົບປະມານ</option></select>
         </div>
-        <div class="form-row"><label>ສ້າງໂດຍ</label><input type="text" id="eDFrom" placeholder="ຊື່ຜູ້ສ້າງ..."></div>
+        <div class="form-row"><label>ສ້າງໂດຍ</label>
+          <select id="eDFrom" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">-- ເລືອກ --</option>
+          </select>
+        </div>
       </div>
       <div class="form-row"><label>ສ່ົງຫາ</label><input type="text" id="eDTo" placeholder="ຊື່ຜູ້ຮັບ..."></div>
       <div class="form-row"><label>ຂັ້ນຕອນ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eDSteps" placeholder="ສ້າງ,ກວດ,ໜ.ພ.,CFO,ອະນຸມັດ"></div>
@@ -1106,25 +1122,43 @@ function showPage(p, btn) {
   if(map[p]) map[p]();
 }
 
+// ════ USER OPTIONS (for dropdowns) ════
+let cachedUserOptions = null;
+
+async function loadUserOptions() {
+  if (cachedUserOptions) return cachedUserOptions;
+  const { data } = await db.from('profiles').select('id, email, role').order('email');
+  cachedUserOptions = (data || []).map(u => ({
+    value: (u.email||'').split('@')[0],
+    label: (u.email||'').split('@')[0],
+    email: u.email
+  }));
+  return cachedUserOptions;
+}
+
+async function populateUserSelect(selectId, currentVal, lockToSelf) {
+  const opts = await loadUserOptions();
+  const sel  = document.getElementById(selectId);
+  if (!sel) return;
+  const me = myEmailPrefix();
+  sel.innerHTML = opts.length === 0
+    ? `<option value="${me}">${me} (ທ່ານ)</option>`
+    : opts.map(o => `<option value="${o.value}" ${o.value === (currentVal||me) ? 'selected' : ''}>
+        ${o.value}${o.value === me ? ' (ທ່ານ)' : ''}
+      </option>`).join('');
+  sel.disabled = lockToSelf;
+  sel.style.background = lockToSelf ? 'var(--bg2)' : '';
+  sel.title = lockToSelf ? 'ຕື່ມໂດຍ account ຂອງທ່ານ' : 'ສາມາດ assign ໃຫ້ຄົນອື່ນໄດ້';
+}
+
 function toggleForm(id) {
   const el = document.getElementById(id);
   el.style.display = el.style.display==='none' ? 'block' : 'none';
   if (el.style.display !== 'block') return;
   el.scrollIntoView({behavior:'smooth', block:'nearest'});
-  // Auto-fill owner/created_by from currentUser
-  const emailPrefix = currentUser ? (currentUser.email||'').split('@')[0] : '';
-  if (!emailPrefix) return;
-  const fieldMap = { addTaskForm: 'tOwner', addDocForm: 'dFrom' };
-  const fieldId = fieldMap[id];
-  if (fieldId) {
-    const f = document.getElementById(fieldId);
-    if (f) {
-      if (!f.value) f.value = emailPrefix;   // ຕື່ມຖ້າຫວ່າງ
-      f.readOnly = !isSuperior();            // employee = read-only
-      f.style.background = isSuperior() ? '' : 'var(--bg2)';
-      f.title = isSuperior() ? 'ສາມາດ assign ໃຫ້ຄົນອື່ນໄດ້' : 'ຕື່ມໂດຍ account ຂອງທ່ານ';
-    }
-  }
+  const me = myEmailPrefix();
+  if (id === 'addTaskForm') populateUserSelect('tOwner', me, !isSuperior());
+  if (id === 'addDocForm')  populateUserSelect('dFrom',  me, !isSuperior());
 }
 
 function toast(msg) {
@@ -1365,7 +1399,6 @@ function openEditTask(id) {
   const t = allTasks.find(x=>x.id===id);
   if(!t) return;
   document.getElementById('eName').value = t.name;
-  document.getElementById('eOwner').value = t.owner;
   document.getElementById('eDue').value = t.due_date;
   document.getElementById('ePri').value = t.priority;
   document.getElementById('eStatus').value = t.status;
@@ -1373,6 +1406,9 @@ function openEditTask(id) {
   document.getElementById('eProgressVal').textContent = t.progress+'%';
   document.getElementById('eNotes').value = t.notes||'';
   document.getElementById('editTaskId').value = id;
+  // populate owner dropdown — superior ເລືອກໄດ້, owner ຂອງຕົນ lock
+  const lockOwner = !isSuperior();
+  populateUserSelect('eOwner', t.owner, lockOwner);
   const form = document.getElementById('editTaskForm');
   form.style.display='block';
   form.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1519,7 +1555,6 @@ function openEditDoc(id) {
   if(!d) return;
   document.getElementById('editDocId').value = id;
   document.getElementById('eDName').value = d.name;
-  document.getElementById('eDFrom').value = d.created_by||'';
   document.getElementById('eDTo').value   = d.sent_to||'';
   document.getElementById('eDSteps').value = (d.steps||[]).join(',');
   const sel = document.getElementById('eDType');
@@ -1527,6 +1562,7 @@ function openEditDoc(id) {
   for(let i=0;i<sel.options.length;i++){
     if(sel.options[i].value.startsWith(tp)){ sel.selectedIndex=i; break; }
   }
+  populateUserSelect('eDFrom', d.created_by||'', !isSuperior());
   const form = document.getElementById('editDocForm');
   form.style.display = 'block';
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
