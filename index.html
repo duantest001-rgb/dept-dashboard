@@ -203,7 +203,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <button class="active" onclick="showPage('dash',this)"><i class="ti ti-home"></i> Overview</button>
     <button onclick="showPage('tasks',this)"><i class="ti ti-checkbox"></i> ໜ້າວຽກ</button>
     <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
-    <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ປະຊຸມ</button>
+    <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ນັດໝາຍ</button>
     <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
     <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
     <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
@@ -457,15 +457,24 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   <!-- ── MEETINGS ── -->
   <div class="page" id="page-meet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <span style="font-size:13px;color:var(--muted)">ຕາຕະລາງກອງປະຊຸມ</span>
+      <span style="font-size:13px;color:var(--muted)">ຕາຕະລາງນັດໝາຍ & ກອງປະຊຸມ</span>
       <button class="btn-outline" onclick="toggleForm('addMeetForm')"><i class="ti ti-plus"></i> ນັດໃໝ່</button>
     </div>
     <div class="search-panel">
       <div style="position:relative">
         <i class="ti ti-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)"></i>
-        <input type="text" id="meetSearch" placeholder="ຄົ້ນຫາຊື່ກອງປະຊຸມ..." oninput="renderMeet()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
+        <input type="text" id="meetSearch" placeholder="ຄົ້ນຫາ..." oninput="renderMeet()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
       </div>
       <div class="search-grid">
+        <div class="form-row" style="margin-bottom:0"><label>ປະເພດ</label>
+          <select id="mFilterType" onchange="renderMeet()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">ທັງໝົດ</option>
+            <option value="ກອງປະຊຸມ">🏛️ ກອງປະຊຸມ</option>
+            <option value="ນັດໝາຍ">🤝 ນັດໝາຍ</option>
+            <option value="ກິດຈະກຳ">🎯 ກິດຈະກຳ</option>
+            <option value="ອົບຮົມ">📚 ອົບຮົມ</option>
+          </select>
+        </div>
         <div class="form-row" style="margin-bottom:0"><label>ວັນທີ ຈາກ</label>
           <input type="date" id="mSearchFrom" onchange="renderMeet()" style="font-size:12px;padding:5px 8px">
         </div>
@@ -483,8 +492,18 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     </div>
     <div class="card"><div id="meetList"><div class="spinner">ໂຫຼດ...</div></div></div>
     <div class="card" id="addMeetForm" style="display:none">
-      <div class="card-title"><i class="ti ti-calendar-plus"></i> ນັດກອງປະຊຸມໃໝ່</div>
-      <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="mTitle" placeholder="ຊື່ກອງປະຊຸມ..."></div>
+      <div class="card-title"><i class="ti ti-calendar-plus"></i> ນັດໝາຍ / ກອງປະຊຸມໃໝ່</div>
+      <div class="row2">
+        <div class="form-row"><label>ປະເພດ *</label>
+          <select id="mType" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="ກອງປະຊຸມ">🏛️ ກອງປະຊຸມ</option>
+            <option value="ນັດໝາຍ">🤝 ນັດໝາຍ</option>
+            <option value="ກິດຈະກຳ">🎯 ກິດຈະກຳ</option>
+            <option value="ອົບຮົມ">📚 ອົບຮົມ</option>
+          </select>
+        </div>
+        <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="mTitle" placeholder="ຊື່..."></div>
+      </div>
       <div class="row2">
         <div class="form-row"><label>ວັນທີ</label><input type="date" id="mDate"></div>
         <div class="form-row"><label>ເວລາ</label><input type="time" id="mTime"></div>
@@ -498,9 +517,19 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
     </div>
     <div class="card" id="editMeetForm" style="display:none">
-      <div class="card-title"><i class="ti ti-calendar-event" style="color:var(--c2)"></i> ແກ້ໄຂກອງປະຊຸມ</div>
+      <div class="card-title"><i class="ti ti-calendar-event" style="color:var(--c2)"></i> ແກ້ໄຂນັດໝາຍ</div>
       <input type="hidden" id="editMeetId">
-      <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="eMTitle" placeholder="ຊື່ກອງປະຊຸມ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ປະເພດ *</label>
+          <select id="eMType" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="ກອງປະຊຸມ">🏛️ ກອງປະຊຸມ</option>
+            <option value="ນັດໝາຍ">🤝 ນັດໝາຍ</option>
+            <option value="ກິດຈະກຳ">🎯 ກິດຈະກຳ</option>
+            <option value="ອົບຮົມ">📚 ອົບຮົມ</option>
+          </select>
+        </div>
+        <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="eMTitle" placeholder="ຊື່..."></div>
+      </div>
       <div class="row2">
         <div class="form-row"><label>ວັນທີ</label><input type="date" id="eMDate"></div>
         <div class="form-row"><label>ເວລາ</label><input type="time" id="eMTime"></div>
@@ -1527,19 +1556,32 @@ function renderMeet() {
   const fromD   = document.getElementById('mSearchFrom')?.value||'';
   const toD     = document.getElementById('mSearchTo')?.value||'';
   const locQ    = (document.getElementById('mSearchLoc')?.value||'').toLowerCase();
+  const typeQ   = document.getElementById('mFilterType')?.value||'';
+  const typeMap = {
+    'ກອງປະຊຸມ': {icon:'🏛️', bg:'#E6F1FB', color:'#185FA5'},
+    'ນັດໝາຍ':   {icon:'🤝', bg:'#E1F5EE', color:'#0F6E56'},
+    'ກິດຈະກຳ':  {icon:'🎯', bg:'#FAECE7', color:'#993C1D'},
+    'ອົບຮົມ':   {icon:'📚', bg:'#F5EEF8', color:'#6C3483'},
+  };
   let meets = allMeets;
   if (q)     meets = meets.filter(m => m.title.toLowerCase().includes(q));
   if (fromD) meets = meets.filter(m => m.meet_date >= fromD);
   if (toD)   meets = meets.filter(m => m.meet_date <= toD);
   if (locQ)  meets = meets.filter(m => (m.location||'').toLowerCase().includes(locQ));
+  if (typeQ) meets = meets.filter(m => (m.meet_type||'ກອງປະຊຸມ') === typeQ);
   document.getElementById('meetList').innerHTML = meets.length===0
-    ? '<div class="empty">ບໍ່ພົບກອງປະຊຸມ</div>'
+    ? '<div class="empty">ບໍ່ພົບລາຍການ</div>'
     : meets.map(m=>{
       const att = m.attendees||[];
       const avatars = att.map((a,i)=>`<div class="avatar" style="background:${acBg[i%5]};color:${acText[i%5]}">${a}</div>`).join('');
+      const tp = m.meet_type||'ກອງປະຊຸມ';
+      const tm = typeMap[tp]||{icon:'📅', bg:'#F1EFE8', color:'#5F5E5A'};
       return `<div class="meeting-item">
         <div class="meet-date"><div class="md">${m.meet_date.slice(5)}</div><div class="mt">${m.meet_time}</div></div>
         <div class="meet-info">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+            <span style="background:${tm.bg};color:${tm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${tm.icon} ${tp}</span>
+          </div>
           <div class="meet-title">${m.title}</div>
           <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location}${m.notes?' · '+m.notes:''}</div>
           <div class="attendees">${avatars}</div>
@@ -1556,6 +1598,7 @@ function openEditMeet(id) {
   const m = allMeets.find(x=>x.id===id);
   if(!m) return;
   document.getElementById('editMeetId').value  = id;
+  document.getElementById('eMType').value      = m.meet_type||'ກອງປະຊຸມ';
   document.getElementById('eMTitle').value     = m.title;
   document.getElementById('eMDate').value      = m.meet_date;
   document.getElementById('eMTime').value      = m.meet_time;
@@ -1572,8 +1615,10 @@ async function saveEditMeet() {
   const t  = document.getElementById('eMTitle').value.trim();
   if(!t){ toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
   const att = document.getElementById('eMAtt').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const tp  = document.getElementById('eMType').value;
   const {error} = await db.from('meetings').update({
     title:t,
+    meet_type: tp,
     meet_date: document.getElementById('eMDate').value||'—',
     meet_time: document.getElementById('eMTime').value||'—',
     location:  document.getElementById('eMLoc').value||'ຫ້ອງປະຊຸມ',
@@ -1582,8 +1627,8 @@ async function saveEditMeet() {
   }).eq('id',id);
   if(error){ toast('❌ '+error.message); return; }
   await logAction('updated','meeting', id, t,
-    `${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value}`);
-  toast('✅ ແກ້ໄຂກອງປະຊຸມສຳເລັດ!');
+    `[${tp}] ${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value}`);
+  toast('✅ ແກ້ໄຂສຳເລັດ!');
   document.getElementById('editMeetForm').style.display = 'none';
   loadMeet();
 }
@@ -1606,7 +1651,7 @@ function clearDocSearch() {
 }
 
 function clearMeetSearch() {
-  ['meetSearch','mSearchFrom','mSearchTo','mSearchLoc'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['meetSearch','mSearchFrom','mSearchTo','mSearchLoc','mFilterType'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderMeet();
 }
 
@@ -1615,16 +1660,18 @@ async function saveMeet() {
   if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
   const rawAtt = document.getElementById('mAtt').value;
   const att = rawAtt.split(',').map(s=>s.trim()).filter(Boolean);
+  const tp = document.getElementById('mType').value;
   const {error} = await db.from('meetings').insert({
     title:t, meet_date:document.getElementById('mDate').value||'—',
     meet_time:document.getElementById('mTime').value||'—',
     location:document.getElementById('mLoc').value||'ຫ້ອງປະຊຸມ',
-    notes:document.getElementById('mNote').value, attendees:att
+    notes:document.getElementById('mNote').value, attendees:att,
+    meet_type: tp
   });
   if(error){toast('❌ '+error.message);return;}
-  await logAction('created','meeting', 0, document.getElementById('mTitle').value,
-    `${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value}`);
-  toast('✅ ນັດກອງປະຊຸມສຳເລັດ!');
+  await logAction('created','meeting', 0, t,
+    `[${tp}] ${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value}`);
+  toast('✅ ບັນທຶກສຳເລັດ!');
   toggleForm('addMeetForm');
   ['mTitle','mLoc','mAtt','mNote'].forEach(id=>document.getElementById(id).value='');
   loadMeet();
