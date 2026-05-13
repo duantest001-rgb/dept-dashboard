@@ -665,9 +665,28 @@ async function loadUserProfile() {
   }
 }
 
-function canEdit() { return ['admin','manager','employee'].includes(currentRole); }
-function canDelete() { return ['admin','manager'].includes(currentRole); }
-function canAdmin() { return currentRole === 'admin'; }
+function canAdmin()   { return currentRole === 'admin'; }
+function isSuperior() { return ['admin','manager'].includes(currentRole); }
+function myEmailPrefix() { return currentUser ? (currentUser.email||'').split('@')[0] : ''; }
+
+// Tasks
+function canEditTask(task)   { return isSuperior() || myEmailPrefix() === (task.owner||''); }
+function canDeleteTask()     { return isSuperior(); }
+function canCommentTask(task){ return isSuperior() || myEmailPrefix() === (task.owner||''); }
+
+// Docs
+function canEditDoc(doc)   { return isSuperior() || myEmailPrefix() === (doc.created_by||''); }
+function canDeleteDoc()    { return isSuperior(); }
+
+// Announcements
+function canManageAnn()  { return canAdmin(); }
+
+// ack/fixed: superior ຫຼື ຄົນທີ່ບໍ່ແມ່ນເຈົ້າຂອງ comment
+function canAckComment(comment) { return isSuperior() || (currentUser && comment.user_id !== currentUser.id); }
+
+// Legacy aliases (meetings ໃຊ້)
+function canEdit()   { return isSuperior(); }
+function canDelete() { return isSuperior(); }
 
 // ── ACTIVITY LOG ──────────────────────────────────
 async function logAction(action, target_type, target_id, target_name, detail='') {
@@ -731,8 +750,8 @@ async function loadAllCommentPreviews() {
       const who  = (c.user_email||'').split('@')[0];
       const ackd = c.ack_by ? `<span style="font-size:10px;background:#E1F5EE;color:#0F6E56;padding:1px 6px;border-radius:8px;margin-left:4px">✓ ຮັບຮູ້</span>` : '';
       const fixed = c.fixed_by ? `<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:8px;margin-left:4px">🔧 ແກ້ໄປ</span>` : '';
-      const canAck   = !c.ack_by   && currentUser && c.user_id !== currentUser.id;
-      const canFixed = !c.fixed_by && currentUser && c.user_id !== currentUser.id;
+      const canAck   = !c.ack_by   && canAckComment(c);
+      const canFixed = !c.fixed_by && canAckComment(c);
       return `<div style="background:${bg};border-radius:6px;padding:5px 8px;margin-bottom:4px;font-size:12px;color:${col}">
         <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
           <span style="font-weight:500">${icon} ${who}:</span>
@@ -814,8 +833,8 @@ async function loadComments(taskId) {
         const icon = typeIcon[ut]||'💬';
         const bg = typeBg[ut]||'var(--c5l)';
         const col = typeColor[ut]||'var(--c5m)';
-        const canAck   = !c.ack_by   && currentUser && c.user_id !== currentUser.id;
-        const canFixed = !c.fixed_by && currentUser && c.user_id !== currentUser.id;
+        const canAck   = !c.ack_by   && canAckComment(c);
+        const canFixed = !c.fixed_by && canAckComment(c);
         return `<div class="comment-item" style="border-left:3px solid ${col};padding-left:10px;border-radius:0">
           <div class="comment-header">
             <div class="comment-avatar" style="background:${bg};color:${col}">${initials}</div>
@@ -1090,7 +1109,22 @@ function showPage(p, btn) {
 function toggleForm(id) {
   const el = document.getElementById(id);
   el.style.display = el.style.display==='none' ? 'block' : 'none';
-  if(el.style.display==='block') el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  if (el.style.display !== 'block') return;
+  el.scrollIntoView({behavior:'smooth', block:'nearest'});
+  // Auto-fill owner/created_by from currentUser
+  const emailPrefix = currentUser ? (currentUser.email||'').split('@')[0] : '';
+  if (!emailPrefix) return;
+  const fieldMap = { addTaskForm: 'tOwner', addDocForm: 'dFrom' };
+  const fieldId = fieldMap[id];
+  if (fieldId) {
+    const f = document.getElementById(fieldId);
+    if (f) {
+      if (!f.value) f.value = emailPrefix;   // ຕື່ມຖ້າຫວ່າງ
+      f.readOnly = !isSuperior();            // employee = read-only
+      f.style.background = isSuperior() ? '' : 'var(--bg2)';
+      f.title = isSuperior() ? 'ສາມາດ assign ໃຫ້ຄົນອື່ນໄດ້' : 'ຕື່ມໂດຍ account ຂອງທ່ານ';
+    }
+  }
 }
 
 function toast(msg) {
@@ -1182,7 +1216,7 @@ async function loadDash() {
       </div>`).join('');
 
   const anns = annRes.data||[];
-  if (canAdmin()) {
+  if (canManageAnn()) {
     const btn = document.getElementById('addAnnBtn');
     if (btn) btn.style.display = 'inline-block';
   }
@@ -1197,7 +1231,7 @@ async function loadDash() {
           <span>ໂດຍ ${a.author} · ${new Date(a.created_at).toLocaleDateString('lo-LA')}</span>
         </div>
       </div>
-      ${canAdmin()?`<button onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
+      ${canManageAnn()?`<button onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
     </div>`).join('');
 }
 
@@ -1260,9 +1294,9 @@ function renderTasks() {
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;color:var(--muted)">${t.progress}%</span>
           <div style="display:flex;gap:4px">
-            <button onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>
-            <button onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>
-            <button onclick="toggleComments(${t.id})" style="border:1px solid var(--border);background:#eeedfe;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#534AB7" title="Comment"><i class="ti ti-message"></i></button>
+            ${canEditTask(t)?`<button onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>`:''}
+            ${canDeleteTask()?`<button onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>`:''}
+            ${canCommentTask(t)?`<button onclick="toggleComments(${t.id})" style="border:1px solid var(--border);background:#eeedfe;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#534AB7" title="Comment"><i class="ti ti-message"></i></button>`:'<button disabled style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--muted);cursor:not-allowed" title="ເບິ່ງໄດ້ຢ່າງດຽວ"><i class="ti ti-lock"></i></button>'}
           </div>
         </div>
       </div>
@@ -1292,21 +1326,21 @@ function renderTasks() {
           <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600">ປະເພດ update</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button onclick="setUpdateType(${t.id},'update')" id="utype-update-${t.id}"
-              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--c2);background:var(--c2l);color:var(--c2m);cursor:pointer;font-family:inherit">
-              📝 ອັບເດດ
-            </button>
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--c2);background:var(--c2l);color:var(--c2m);cursor:pointer;font-family:inherit"
+              title="ລາຍງານຄວາມຄືບໜ້າ ຫຼື ຜົນດຳເນີນວຽກ">📝 ອັບເດດ</button>
             <button onclick="setUpdateType(${t.id},'blocker')" id="utype-blocker-${t.id}"
-              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
-              ⛔ ຕິດຂັດ
-            </button>
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit"
+              title="ແຈ້ງໃຫ້ຫົວໜ້າຮູ້ວ່າວຽກຕິດຂັດ ລໍຖ້າການຊ່ວຍເຫຼືອ">⛔ ຕິດຂັດ</button>
             <button onclick="setUpdateType(${t.id},'resolved')" id="utype-resolved-${t.id}"
-              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
-              ✅ ແກ້ໄຂໄດ້
-            </button>
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit"
+              title="ແຈ້ງວ່າຂໍ້ຕິດຂັດໄດ້ຖືກແກ້ໄຂແລ້ວ">✅ ແກ້ໄຂໄດ້</button>
             <button onclick="setUpdateType(${t.id},'note')" id="utype-note-${t.id}"
-              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit">
-              💬 ໝາຍເຫດ
-            </button>
+              style="font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit"
+              title="ໝາຍເຫດ ຫຼື ຂໍ້ຄວາມທົ່ວໄປ ບໍ່ກ່ຽວກັບ progress">💬 ໝາຍເຫດ</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:5px;padding:4px 8px;background:var(--bg2);border-radius:5px;line-height:1.5">
+            💡 <strong>ຮັບຮູ້</strong> = ຫົວໜ້າ/admin ຢັ້ງຢືນວ່າໄດ້ຮັບຊາບ update ແລ້ວ &nbsp;|&nbsp;
+            <strong>ແກ້ໄປ</strong> = ຢັ້ງຢືນວ່າຂໍ້ຕິດຂັດໄດ້ຖືກດຳເນີນການແລ້ວ
           </div>
         </div>
 
@@ -1407,8 +1441,11 @@ async function saveTask() {
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກດ້ວຍ');return;}
   const btn = document.getElementById('saveTaskBtn');
   btn.disabled=true; btn.textContent='ກຳລັງບັນທຶກ...';
+  // Normalize owner — employee ຈະ save email prefix ຂອງຕົນ, superior ພິມຊື່ໃດກໍ່ໄດ້
+  const ownerRaw = document.getElementById('tOwner').value.trim();
+  const owner = ownerRaw || myEmailPrefix() || '—';
   const {data, error} = await db.from('tasks').insert({
-    name:n, owner:document.getElementById('tOwner').value||'—',
+    name:n, owner,
     due_date:document.getElementById('tDue').value||'—',
     priority:document.getElementById('tPri').value,
     status:document.getElementById('tStatus').value,
@@ -1458,9 +1495,9 @@ function renderDocs() {
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
           <div class="flow-steps">${stepsHtml}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            ${!isDone?`<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
-            ${canEdit()?`<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
-            ${canDelete()?`<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
+            ${!isDone && isSuperior()?`<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
+            ${canEditDoc(d)?`<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
+            ${canDeleteDoc()?`<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
           </div>
         </div>
       </div>`;
@@ -1529,15 +1566,17 @@ async function saveDoc() {
   const tp = document.getElementById('dType').value.split(' ')[0];
   const rawSteps = document.getElementById('dSteps').value;
   const steps = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
+  const fromRaw = document.getElementById('dFrom').value.trim();
+  const created_by = fromRaw || myEmailPrefix() || '—';
   const {error} = await db.from('documents').insert({
     name:n, doc_type:tp,
-    created_by:document.getElementById('dFrom').value||'—',
+    created_by,
     sent_to:document.getElementById('dTo').value||'—',
     steps:steps, current_step:0
   });
   if(error){toast('❌ '+error.message);return;}
-  await logAction('created','document', 0, document.getElementById('dName').value,
-    `ສ້າງໂດຍ: ${document.getElementById('dFrom').value} → ${document.getElementById('dTo').value}`);
+  await logAction('created','document', 0, n,
+    `ສ້າງໂດຍ: ${created_by} → ${document.getElementById('dTo').value}`);
   toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
   toggleForm('addDocForm');
   ['dName','dFrom','dTo'].forEach(id=>document.getElementById(id).value='');
