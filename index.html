@@ -194,7 +194,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <h1><i class="ti ti-building-community" style="color:var(--c1)"></i> Dashboard ພະແນກ</h1>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="date" id="dateNow"></span>
-      <span id="userEmail" style="font-size:12px;color:var(--muted);background:var(--c1l);padding:3px 10px;border-radius:12px;color:var(--c1m)"></span>
+      <span id="userEmail" onclick="openProfileModal()" style="font-size:12px;color:var(--muted);background:var(--c1l);padding:3px 10px;border-radius:12px;color:var(--c1m);cursor:pointer;user-select:none" title="ກົດເພື່ອແກ້ໄຂ Profile"></span>
       <button onclick="doLogout()" style="border:1px solid var(--border);background:transparent;border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit"><i class="ti ti-logout"></i> ອອກ</button>
     </div>
   </div>
@@ -580,6 +580,27 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     </div>
   </div>
 
+  <!-- ── PROFILE MODAL ── -->
+  <div id="profileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+    <div style="background:var(--bg);border-radius:var(--radius-lg);padding:24px;width:min(380px,90vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+      <button onclick="closeProfileModal()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+      <div style="text-align:center;margin-bottom:18px">
+        <div id="profileAvatar" style="width:56px;height:56px;border-radius:50%;background:var(--c1l);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:600;color:var(--c1m);margin:0 auto 8px"></div>
+        <div id="profileEmailLabel" style="font-size:13px;color:var(--muted)"></div>
+        <div id="profileRoleBadge" style="display:inline-block;margin-top:4px;font-size:11px;padding:2px 10px;border-radius:10px"></div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
+      <div style="font-size:13px;font-weight:500;margin-bottom:10px;color:var(--text)"><i class="ti ti-lock"></i> ປ່ຽນລະຫັດຜ່ານ</div>
+      <div class="form-row"><label>ລະຫັດໃໝ່</label>
+        <input type="password" id="newPwd" placeholder="ຢ່າງໜ້ອຍ 6 ຕົວ..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)">
+      </div>
+      <div class="form-row"><label>ຢືນຢັນລະຫັດໃໝ່</label>
+        <input type="password" id="confirmPwd" placeholder="ພິມຄືນ..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)">
+      </div>
+      <button onclick="changePassword()" style="width:100%;padding:9px;background:var(--c1);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;margin-top:4px">🔒 ອັບເດດລະຫັດຜ່ານ</button>
+    </div>
+  </div>
+
 </div><!-- /mainApp -->
 
 <div id="toast"></div>
@@ -907,6 +928,46 @@ async function saveUserRole() {
   document.getElementById('editRoleForm').style.display = 'none';
   loadAdmin();
 }
+
+// ════ PROFILE ════
+function openProfileModal() {
+  if (!currentUser) return;
+  const roleName  = {admin:'Admin',manager:'ຫົວໜ້າ',employee:'ພະນັກງານ',viewer:'Viewer'}[currentRole] || currentRole;
+  const roleColor = {admin:'#993C1D',manager:'#185FA5',employee:'#0F6E56',viewer:'#5F5E5A'}[currentRole] || '#5F5E5A';
+  const roleBg    = {admin:'#FAECE7',manager:'#E6F1FB',employee:'#E1F5EE',viewer:'#F1EFE8'}[currentRole] || '#F1EFE8';
+  const initials  = (currentUser.email||'?').substring(0,2).toUpperCase();
+  document.getElementById('profileAvatar').textContent      = initials;
+  document.getElementById('profileEmailLabel').textContent  = currentUser.email;
+  document.getElementById('profileRoleBadge').textContent   = roleName;
+  document.getElementById('profileRoleBadge').style.background = roleBg;
+  document.getElementById('profileRoleBadge').style.color      = roleColor;
+  document.getElementById('newPwd').value     = '';
+  document.getElementById('confirmPwd').value = '';
+  const modal = document.getElementById('profileModal');
+  modal.style.display = 'flex';
+}
+
+function closeProfileModal() {
+  document.getElementById('profileModal').style.display = 'none';
+}
+
+async function changePassword() {
+  const pwd1 = document.getElementById('newPwd').value;
+  const pwd2 = document.getElementById('confirmPwd').value;
+  if (!pwd1 || pwd1.length < 6) { toast('⚠️ ລະຫັດຕ້ອງຢ່າງໜ້ອຍ 6 ຕົວ'); return; }
+  if (pwd1 !== pwd2)             { toast('⚠️ ລະຫັດທັງສອງບໍ່ຕົງກັນ'); return; }
+  const { error } = await db.auth.updateUser({ password: pwd1 });
+  if (error) { toast('❌ ' + error.message); return; }
+  await logAction('updated', 'profile', 0, currentUser.email, 'ປ່ຽນລະຫັດຜ່ານ');
+  toast('✅ ປ່ຽນລະຫັດຜ່ານສຳເລັດ!');
+  closeProfileModal();
+}
+
+// close modal when clicking backdrop
+document.addEventListener('click', e => {
+  const modal = document.getElementById('profileModal');
+  if (modal && e.target === modal) closeProfileModal();
+});
 
 function initApp() {
   if (SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON')) {
@@ -1601,8 +1662,8 @@ async function loadReport() {
     const wEnd   = new Date(today); wEnd.setDate(wEnd.getDate() - w*7);
     const label  = `${wStart.getDate()}/${wStart.getMonth()+1}`;
     const count  = t.filter(x => {
-      if (x.status !== 'done' || !x.created_at) return false;
-      const d = new Date(x.created_at);
+      if (x.status !== 'done') return false;
+      const d = new Date(x.updated_at || x.created_at);
       return d >= wStart && d < wEnd;
     }).length;
     return {label, count};
