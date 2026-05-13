@@ -6,6 +6,7 @@
 <title>Dashboard ພະແນກພັດທະນາທຸລະກິດ</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 /* ── CONFIG: ໃສ່ຄ່ານີ້ກ່ອນ Deploy ── */
 /* ເປີດໄຟລ໌ config.js ແລ້ວໃສ່ URL + KEY */
@@ -285,7 +286,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ທັງໝົດ <strong id="taskCount" style="color:var(--text)">—</strong> ລາຍການ</span>
       <div style="display:flex;gap:6px">
-        <button class="btn-outline" onclick="exportCSV()" style="font-size:12px"><i class="ti ti-download"></i> CSV</button>
+        <button class="btn-outline" onclick="exportXLSX()" style="font-size:12px"><i class="ti ti-download"></i> Excel</button>
         <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
       </div>
     </div>
@@ -959,21 +960,60 @@ function clearSearch() {
 }
 
 // ── EXPORT CSV ────────────────────────────────────
-function exportCSV() {
-  const headers = ['ID','ຊື່ວຽກ','ຜູ້ຮັບຜິດຊອບ','ກຳນົດສົ່ງ','ສະຖານະ','ຄວາມສຳຄັນ','ຄວາມຄືບໜ້າ%','ໝາຍເຫດ'];
-  const rows = allTasks.map(t => [
-    t.id, `"${t.name}"`, `"${t.owner}"`, t.due_date,
-    t.status, t.priority, t.progress, `"${t.notes||''}"`
-  ]);
-  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `tasks_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('📥 Export CSV ສຳເລັດ!');
+function exportXLSX() {
+  const statusMap   = {inprogress:'ດຳເນີນການ', done:'ສຳເລັດ', blocked:'ຕິດຂັດ', todo:'ລໍຖ້າ', review:'ກວດສອບ'};
+  const priorityMap = {high:'ສູງ 🔴', normal:'ປົກກະຕິ 🟡', low:'ຕ່ຳ 🟢', urgent:'ດ່ວນ 🔴'};
+
+  // ── Sheet 1: ໜ້າວຽກ ──────────────────────────────────
+  const headers = ['#','ຊື່ວຽກ','ຜູ້ຮັບຜິດຊອບ','ກຳນົດສົ່ງ','ສະຖານະ','ຄວາມສຳຄັນ','ຄວາມຄືບໜ້າ','ໝາຍເຫດ'];
+  const rows = allTasks.map(t => {
+    const pct = t.progress || 0;
+    const bar = '█'.repeat(Math.floor(pct/10)) + '░'.repeat(10 - Math.floor(pct/10));
+    return [
+      t.id,
+      t.name || '',
+      t.owner || '',
+      t.due_date || '',
+      statusMap[t.status]   || t.status   || '',
+      priorityMap[t.priority] || t.priority || '',
+      `${bar} ${pct}%`,
+      (t.notes || '').replace(/\n/g, ' | ')
+    ];
+  });
+
+  const ws1Data = [headers, ...rows];
+  const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+
+  // Column widths
+  ws1['!cols'] = [
+    {wch:5},{wch:38},{wch:18},{wch:14},
+    {wch:14},{wch:14},{wch:22},{wch:45}
+  ];
+
+  // ── Sheet 2: ສະຫຼຸບ ─────────────────────────────────
+  const counts = {};
+  allTasks.forEach(t => {
+    const s = statusMap[t.status] || t.status || 'ບໍ່ລະບຸ';
+    counts[s] = (counts[s] || 0) + 1;
+  });
+  const ws2Data = [
+    ['ສະຖານະ','ຈຳນວນ (ວຽກ)'],
+    ...Object.entries(counts),
+    [],
+    ['ລວມທັງໝົດ', allTasks.length],
+    ['Export ວັນທີ', new Date().toLocaleDateString('lo-LA')]
+  ];
+  const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols'] = [{wch:18},{wch:14}];
+
+  // ── Workbook ─────────────────────────────────────────
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, 'ໜ້າວຽກ');
+  XLSX.utils.book_append_sheet(wb, ws2, 'ສະຫຼຸບ');
+
+  const date = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `tasks_${date}.xlsx`);
+  toast('📥 Export Excel ສຳເລັດ!');
 }
 
 // ════ ADMIN ════
