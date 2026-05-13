@@ -422,8 +422,9 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row" style="margin-bottom:0"><label>ສະຖານະ</label>
           <select id="dSearchStatus" onchange="renderDocs()" style="font-size:12px;padding:5px 8px">
             <option value="">ທັງໝົດ</option>
-            <option value="pending">ລໍຖ້າ</option>
-            <option value="done">ອະນຸມັດແລ້ວ</option>
+            <option value="inprogress">ດຳເນີນຢູ່</option>
+            <option value="done">ສຳເລັດ</option>
+            <option value="cancelled">ຍົກເລີກ</option>
           </select>
         </div>
         <div class="form-row" style="margin-bottom:0">
@@ -658,6 +659,25 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <input type="password" id="confirmPwd" placeholder="ພິມຄືນ..." style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text)">
       </div>
       <button onclick="changePassword()" style="width:100%;padding:9px;background:var(--c1);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500;margin-top:4px">🔒 ອັບເດດລະຫັດຜ່ານ</button>
+    </div>
+  </div>
+
+  <!-- ── STEP COMMENT MODAL ── -->
+  <div id="stepCommentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+    <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:min(380px,90vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+      <button onclick="closeStepComment()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px"><i class="ti ti-message" style="color:var(--c2)"></i> Comment ຂັ້ນຕອນ</div>
+      <div id="scStepName" style="font-size:12px;color:var(--muted);margin-bottom:12px;padding:4px 8px;background:var(--bg2);border-radius:5px"></div>
+      <input type="hidden" id="scDocId">
+      <input type="hidden" id="scStepIdx">
+      <div class="form-row">
+        <label>ຂໍ້ຄວາມ / ໝາຍເຫດ / ຕີກັບ</label>
+        <textarea id="scText" rows="3" placeholder="ເຊັ່ນ: ຕີກັບເພາະຍັງຂາດລາຍເຊັນ CFO, ຫຼື ອະນຸມັດ..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--text);resize:vertical;font-family:inherit"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="saveStepComment()" style="flex:1;padding:8px;background:var(--c2);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">💬 ບັນທຶກ</button>
+        <button onclick="closeStepComment()" style="padding:8px 14px;border:1px solid var(--border);background:var(--bg);border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)">ຍົກເລີກ</button>
+      </div>
     </div>
   </div>
 
@@ -1602,32 +1622,136 @@ function renderDocs() {
   if (q)       docs = docs.filter(d => d.name.toLowerCase().includes(q));
   if (fromQ)   docs = docs.filter(d => (d.created_by||'').toLowerCase().includes(fromQ));
   if (typeQ)   docs = docs.filter(d => d.doc_type === typeQ);
-  if (statusQ === 'done')    docs = docs.filter(d => d.current_step >= (d.steps||[]).length-1);
-  if (statusQ === 'pending') docs = docs.filter(d => d.current_step < (d.steps||[]).length-1);
+  if (statusQ === 'done')       docs = docs.filter(d => d.doc_status === 'done' || d.current_step >= (d.steps||[]).length-1);
+  if (statusQ === 'inprogress') docs = docs.filter(d => !d.doc_status || d.doc_status === 'inprogress');
+  if (statusQ === 'cancelled')  docs = docs.filter(d => d.doc_status === 'cancelled');
+
+  const statusBadge = {
+    done:      `<span style="background:#D4EDDA;color:#155724;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">✅ ສຳເລັດ</span>`,
+    cancelled: `<span style="background:#F8D7DA;color:#721C24;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">🚫 ຍົກເລີກ</span>`,
+    inprogress:`<span style="background:#FFF3CD;color:#856404;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">🔄 ດຳເນີນຢູ່</span>`,
+  };
+
   document.getElementById('docList').innerHTML = docs.length===0
     ? '<div class="empty">ບໍ່ພົບເອກະສານ</div>'
     : docs.map(d=>{
-      const steps = d.steps||[];
+      const steps       = d.steps||[];
+      const isDone      = d.doc_status === 'done'      || d.current_step >= steps.length-1;
+      const isCancelled = d.doc_status === 'cancelled';
+      const docStatus   = d.doc_status || (isDone ? 'done' : 'inprogress');
+      const stepComments = d.step_comments || {};
+
       const stepsHtml = steps.map((s,i)=>{
-        const cls = i<d.current_step?'done':i===d.current_step?'current':'wait';
-        const line = i<steps.length-1?`<div class="fstep-line" style="background:${i<d.current_step?'var(--c1)':'var(--border)'}"></div>`:'';
-        return `<div class="fstep-wrap"><div class="fstep ${cls}"><div class="fstep-circle">${i<d.current_step?'✓':i+1}</div><div class="fstep-label">${s}</div></div>${line}</div>`;
+        const done    = i < d.current_step || isDone;
+        const current = i === d.current_step && !isDone && !isCancelled;
+        const cls     = done ? 'done' : current ? 'current' : 'wait';
+        const line    = i < steps.length-1
+          ? `<div class="fstep-line" style="background:${done?'var(--c1)':'var(--border)'}"></div>` : '';
+        const coms    = stepComments[i] || [];
+        const comBadge = coms.length > 0
+          ? `<div style="font-size:9px;background:#E6F1FB;color:#185FA5;border-radius:8px;padding:1px 5px;margin-top:2px;cursor:pointer" onclick="toggleStepComments(${d.id},${i})">💬 ${coms.length}</div>` : '';
+        const comBtn = `<div style="font-size:9px;color:var(--muted);margin-top:2px;cursor:pointer;text-decoration:underline" onclick="openStepComment(${d.id},${i},\`${s}\`)">+ comment</div>`;
+        const comLog = coms.length > 0
+          ? `<div id="stepcom-${d.id}-${i}" style="display:none;margin-top:4px;padding:4px 6px;background:var(--bg2);border-radius:5px;border:1px solid var(--border);min-width:120px">
+              ${coms.map(cm=>`<div style="font-size:10px;padding:2px 0;border-bottom:1px solid var(--border)"><strong>${cm.by}</strong>: ${cm.text} <span style="opacity:.5;font-size:9px">${cm.at}</span></div>`).join('')}
+            </div>` : '';
+        return `<div class="fstep-wrap">
+          <div class="fstep ${cls}">
+            <div class="fstep-circle">${done?'✓':i+1}</div>
+            <div class="fstep-label">${s}</div>
+            ${comBadge}
+            ${comBtn}
+          </div>
+          ${comLog}
+          ${line}
+        </div>`;
       }).join('');
-      const isDone = d.current_step>=steps.length-1;
-      return `<div class="doc-item">
+
+      return `<div class="doc-item" style="${isCancelled?'opacity:0.65':''}">
         <div class="doc-icon">${d.doc_type}</div>
         <div class="doc-info">
-          <div class="doc-name">${d.name} ${isDone?'<span class="badge done-b">ສຳເລັດ</span>':''}</div>
+          <div class="doc-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${d.name} ${statusBadge[docStatus]||statusBadge.inprogress}
+          </div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
           <div class="flow-steps">${stepsHtml}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            ${!isDone && isSuperior()?`<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>`:''}
-            ${canEditDoc(d)?`<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
-            ${canDeleteDoc()?`<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
+            ${!isDone && !isCancelled && isSuperior()
+              ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
+            ${!isCancelled && isSuperior()
+              ? `<button onclick="cancelDoc(${d.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-ban"></i> ຍົກເລີກ</button>` : ''}
+            ${isCancelled && isSuperior()
+              ? `<button onclick="restoreDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
+            ${canEditDoc(d) && !isCancelled
+              ? `<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
+            ${canDeleteDoc()
+              ? `<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
           </div>
         </div>
       </div>`;
     }).join('');
+}
+
+
+async function cancelDoc(id) {
+  if (!confirm('ຢືນຢັນຍົກເລີກເອກະສານນີ້?')) return;
+  const {error} = await db.from('documents').update({doc_status:'cancelled'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','document',id,'','doc_status → cancelled');
+  toast('🚫 ຍົກເລີກເອກະສານແລ້ວ');
+  loadDocs();
+}
+
+async function restoreDoc(id) {
+  const {error} = await db.from('documents').update({doc_status:'inprogress'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','document',id,'','doc_status → inprogress');
+  toast('✅ ຟື້ນຟູເອກະສານແລ້ວ');
+  loadDocs();
+}
+
+function toggleStepComments(docId, stepIdx) {
+  const el = document.getElementById(`stepcom-${docId}-${stepIdx}`);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function openStepComment(docId, stepIdx, stepName) {
+  document.getElementById('scDocId').value   = docId;
+  document.getElementById('scStepIdx').value = stepIdx;
+  document.getElementById('scStepName').textContent = `ຂັ້ນ ${stepIdx+1}: ${stepName}`;
+  document.getElementById('scText').value    = '';
+  document.getElementById('stepCommentModal').style.display = 'flex';
+}
+
+function closeStepComment() {
+  document.getElementById('stepCommentModal').style.display = 'none';
+}
+
+async function saveStepComment() {
+  const docId   = parseInt(document.getElementById('scDocId').value);
+  const stepIdx = parseInt(document.getElementById('scStepIdx').value);
+  const text    = document.getElementById('scText').value.trim();
+  if (!text) { toast('⚠️ ໃສ່ຂໍ້ຄວາມກ່ອນ'); return; }
+
+  // ດຶງ doc ປັດຈຸບັນ
+  const {data, error} = await db.from('documents').select('step_comments').eq('id',docId).single();
+  if (error) { toast('❌ '+error.message); return; }
+
+  const existing = data.step_comments || {};
+  const stepComs = existing[stepIdx] || [];
+  stepComs.push({
+    by:  myEmailPrefix() || 'unknown',
+    text: text,
+    at:  new Date().toLocaleString('lo-LA')
+  });
+  existing[stepIdx] = stepComs;
+
+  const {error: e2} = await db.from('documents').update({step_comments: existing}).eq('id',docId);
+  if (e2) { toast('❌ '+e2.message); return; }
+  await logAction('commented','document', docId, `ຂັ້ນ ${stepIdx+1}`, text);
+  toast('💬 ບັນທຶກ comment ແລ້ວ!');
+  closeStepComment();
+  loadDocs();
 }
 
 async function advanceDoc(id, cur, total) {
