@@ -25,10 +25,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
 /* ── Layout ── */
 .app{max-width:960px;margin:0 auto;padding:1.25rem 1rem 3rem}
-.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.sticky-header{position:sticky;top:0;z-index:100;background:var(--bg);max-width:960px;margin:0 auto;padding:1.25rem 1rem 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding-bottom:1rem;border-bottom:1px solid var(--border)}
 .topbar h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
 .topbar .date{font-size:13px;color:var(--muted)}
-.nav{display:flex;gap:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+.nav{display:flex;gap:6px;padding:0.75rem 0;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:0}
 .nav button{padding:7px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;font-family:inherit}
 .nav button.active{background:var(--text);color:var(--bg);border-color:var(--text)}
 .nav button:hover:not(.active){background:var(--border)}
@@ -190,24 +191,28 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
 <div class="app" id="mainApp" style="display:none">
 
-  <div class="topbar">
-    <h1><i class="ti ti-building-community" style="color:var(--c1)"></i> Dashboard ພະແນກ</h1>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="date" id="dateNow"></span>
-      <span id="userEmail" onclick="openProfileModal()" style="font-size:12px;color:var(--muted);background:var(--c1l);padding:3px 10px;border-radius:12px;color:var(--c1m);cursor:pointer;user-select:none" title="ກົດເພື່ອແກ້ໄຂ Profile"></span>
-      <button onclick="doLogout()" style="border:1px solid var(--border);background:transparent;border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit"><i class="ti ti-logout"></i> ອອກ</button>
+  <div class="sticky-header">
+    <div class="topbar">
+      <h1><i class="ti ti-building-community" style="color:var(--c1)"></i> Dashboard ພະແນກ</h1>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="date" id="dateNow"></span>
+        <span id="userEmail" onclick="openProfileModal()" style="font-size:12px;color:var(--muted);background:var(--c1l);padding:3px 10px;border-radius:12px;color:var(--c1m);cursor:pointer;user-select:none" title="ກົດເພື່ອແກ້ໄຂ Profile"></span>
+        <button onclick="doLogout()" style="border:1px solid var(--border);background:transparent;border-radius:var(--radius);padding:5px 10px;cursor:pointer;font-size:12px;color:var(--muted);font-family:inherit"><i class="ti ti-logout"></i> ອອກ</button>
+      </div>
     </div>
+
+    <nav class="nav">
+      <button class="active" onclick="showPage('dash',this)"><i class="ti ti-home"></i> Overview</button>
+      <button onclick="showPage('tasks',this)"><i class="ti ti-checkbox"></i> ໜ້າວຽກ</button>
+      <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
+      <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ນັດໝາຍ</button>
+      <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
+      <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
+      <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
+    </nav>
   </div>
 
-  <nav class="nav">
-    <button class="active" onclick="showPage('dash',this)"><i class="ti ti-home"></i> Overview</button>
-    <button onclick="showPage('tasks',this)"><i class="ti ti-checkbox"></i> ໜ້າວຽກ</button>
-    <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
-    <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ນັດໝາຍ</button>
-    <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
-    <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
-    <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
-  </nav>
+  <div style="padding-top:1.5rem">
 
   <!-- ── ADMIN ── -->
   <div class="page" id="page-admin">
@@ -646,6 +651,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     </div>
   </div>
 
+</div><!-- /content-area -->
 </div><!-- /mainApp -->
 
 <div id="toast"></div>
