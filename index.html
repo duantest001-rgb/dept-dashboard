@@ -467,6 +467,22 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <button class="btn-outline" onclick="toggleForm('addMeetForm')">ຍົກເລີກ</button>
       </div>
     </div>
+    <div class="card" id="editMeetForm" style="display:none">
+      <div class="card-title"><i class="ti ti-calendar-event" style="color:var(--c2)"></i> ແກ້ໄຂກອງປະຊຸມ</div>
+      <input type="hidden" id="editMeetId">
+      <div class="form-row"><label>ຫົວຂໍ້ *</label><input type="text" id="eMTitle" placeholder="ຊື່ກອງປະຊຸມ..."></div>
+      <div class="row2">
+        <div class="form-row"><label>ວັນທີ</label><input type="date" id="eMDate"></div>
+        <div class="form-row"><label>ເວລາ</label><input type="time" id="eMTime"></div>
+      </div>
+      <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="eMLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
+      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eMAtt" placeholder="ສສ,ບທ,ມລ..."></div>
+      <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="eMNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveEditMeet()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-outline" onclick="document.getElementById('editMeetForm').style.display='none'">ຍົກເລີກ</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── ACTIVITY LOG ── -->
@@ -1369,12 +1385,49 @@ function renderMeet() {
           <div class="meet-title">${m.title}</div>
           <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location}${m.notes?' · '+m.notes:''}</div>
           <div class="attendees">${avatars}</div>
-          <div style="margin-top:6px">
-            <button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            ${canEdit()?`<button onclick="openEditMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
+            ${canDelete()?`<button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
           </div>
         </div>
       </div>`;
     }).join('');
+}
+
+function openEditMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('editMeetId').value  = id;
+  document.getElementById('eMTitle').value     = m.title;
+  document.getElementById('eMDate').value      = m.meet_date;
+  document.getElementById('eMTime').value      = m.meet_time;
+  document.getElementById('eMLoc').value       = m.location||'';
+  document.getElementById('eMAtt').value       = (m.attendees||[]).join(',');
+  document.getElementById('eMNote').value      = m.notes||'';
+  const form = document.getElementById('editMeetForm');
+  form.style.display = 'block';
+  form.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveEditMeet() {
+  const id = parseInt(document.getElementById('editMeetId').value);
+  const t  = document.getElementById('eMTitle').value.trim();
+  if(!t){ toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
+  const att = document.getElementById('eMAtt').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const {error} = await db.from('meetings').update({
+    title:t,
+    meet_date: document.getElementById('eMDate').value||'—',
+    meet_time: document.getElementById('eMTime').value||'—',
+    location:  document.getElementById('eMLoc').value||'ຫ້ອງປະຊຸມ',
+    notes:     document.getElementById('eMNote').value,
+    attendees: att
+  }).eq('id',id);
+  if(error){ toast('❌ '+error.message); return; }
+  await logAction('updated','meeting', id, t,
+    `${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value}`);
+  toast('✅ ແກ້ໄຂກອງປະຊຸມສຳເລັດ!');
+  document.getElementById('editMeetForm').style.display = 'none';
+  loadMeet();
 }
 
 async function deleteMeet(id) {
