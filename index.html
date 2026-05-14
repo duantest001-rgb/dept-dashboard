@@ -436,6 +436,17 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <div class="card"><div id="docList"><div class="spinner">ໂຫຼດ...</div></div></div>
     <div class="card" id="addDocForm" style="display:none">
       <div class="card-title"><i class="ti ti-file-plus"></i> ເພີ່ມເອກະສານໃໝ່</div>
+      <div class="row2">
+        <div class="form-row"><label>ທິດທາງ *</label>
+          <select id="dDir" onchange="generateDocNumber()" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="in">📥 ຂາເຂົ້າ</option>
+            <option value="out">📤 ຂາອອກ</option>
+          </select>
+        </div>
+        <div class="form-row"><label>ເລກທີ <span style="font-size:10px;color:var(--muted)">(auto, ແກ້ໄດ້)</span></label>
+          <input type="text" id="dNumber" placeholder="ຂຂ-001/2026" style="font-family:var(--font-mono);font-size:13px">
+        </div>
+      </div>
       <div class="form-row"><label>ຊື່ເອກະສານ *</label><input type="text" id="dName" placeholder="ຊື່ເອກະສານ..."></div>
       <div class="row2">
         <div class="form-row"><label>ປະເພດ</label>
@@ -457,6 +468,17 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <div class="card" id="editDocForm" style="display:none">
       <div class="card-title"><i class="ti ti-file-pencil" style="color:var(--c2)"></i> ແກ້ໄຂເອກະສານ</div>
       <input type="hidden" id="editDocId">
+      <div class="row2">
+        <div class="form-row"><label>ທິດທາງ</label>
+          <select id="eDDir" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="in">📥 ຂາເຂົ້າ</option>
+            <option value="out">📤 ຂາອອກ</option>
+          </select>
+        </div>
+        <div class="form-row"><label>ເລກທີ</label>
+          <input type="text" id="eDNumber" placeholder="ຂຂ-001/2026" style="font-family:var(--font-mono);font-size:13px">
+        </div>
+      </div>
       <div class="form-row"><label>ຊື່ເອກະສານ *</label><input type="text" id="eDName" placeholder="ຊື່ເອກະສານ..."></div>
       <div class="row2">
         <div class="form-row"><label>ປະເພດ</label>
@@ -1281,7 +1303,10 @@ function toggleForm(id) {
   el.scrollIntoView({behavior:'smooth', block:'nearest'});
   const me = myEmailPrefix();
   if (id === 'addTaskForm') populateUserSelect('tOwner', me, !isSuperior());
-  if (id === 'addDocForm')  populateUserSelect('dFrom',  me, !isSuperior());
+  if (id === 'addDocForm')  {
+    populateUserSelect('dFrom', me, !isSuperior());
+    generateDocNumber();
+  }
 }
 
 function toast(msg) {
@@ -1685,6 +1710,7 @@ function renderDocs() {
         <div class="doc-icon">${d.doc_type}</div>
         <div class="doc-info">
           <div class="doc-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${d.doc_number ? `<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;background:${d.doc_direction==='in'?'#E6F1FB':'#E1F5EE'};color:${d.doc_direction==='in'?'#185FA5':'#0F6E56'};padding:2px 8px;border-radius:6px;border:1px solid ${d.doc_direction==='in'?'#B5D4F4':'#9FE1CB'}">${d.doc_direction==='in'?'📥':'📤'} ${d.doc_number}</span>` : `<span style="font-size:10px;color:var(--muted);font-style:italic">${d.doc_direction==='out'?'📤 ຂາອອກ':'📥 ຂາເຂົ້າ'}</span>`}
             ${d.name} ${statusBadge[docStatus]||statusBadge.inprogress}
           </div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
@@ -1868,10 +1894,12 @@ async function revertDoc(id, cur) {
 function openEditDoc(id) {
   const d = allDocs.find(x=>x.id===id);
   if(!d) return;
-  document.getElementById('editDocId').value = id;
-  document.getElementById('eDName').value = d.name;
-  document.getElementById('eDTo').value   = d.sent_to||'';
-  document.getElementById('eDSteps').value = (d.steps||[]).join(',');
+  document.getElementById('editDocId').value  = id;
+  document.getElementById('eDName').value     = d.name;
+  document.getElementById('eDTo').value       = d.sent_to||'';
+  document.getElementById('eDSteps').value    = (d.steps||[]).join(',');
+  document.getElementById('eDNumber').value   = d.doc_number||'';
+  document.getElementById('eDDir').value      = d.doc_direction||'in';
   const sel = document.getElementById('eDType');
   const tp = d.doc_type||'📄';
   for(let i=0;i<sel.options.length;i++){
@@ -1887,15 +1915,18 @@ async function saveEditDoc() {
   const id = parseInt(document.getElementById('editDocId').value);
   const n  = document.getElementById('eDName').value.trim();
   if(!n){ toast('⚠️ ໃສ່ຊື່ເອກະສານ'); return; }
-  const tp    = document.getElementById('eDType').value.split(' ')[0];
-  const steps = document.getElementById('eDSteps').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const from  = document.getElementById('eDFrom').value||'—';
-  const to    = document.getElementById('eDTo').value||'—';
+  const steps  = document.getElementById('eDSteps').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const from   = document.getElementById('eDFrom').value||'—';
+  const to     = document.getElementById('eDTo').value||'—';
+  const docNum = document.getElementById('eDNumber').value.trim()||null;
+  const docDir = document.getElementById('eDDir').value||'in';
   const {error} = await db.from('documents').update({
-    name:n, doc_type:tp, created_by:from, sent_to:to, steps:steps
+    name:n, doc_type: document.getElementById('eDType').value.split(' ')[0],
+    created_by:from, sent_to:to, steps,
+    doc_number: docNum, doc_direction: docDir
   }).eq('id',id);
   if(error){ toast('❌ '+error.message); return; }
-  await logAction('updated','document', id, n, `${from} → ${to} | ຂັ້ນຕອນ: ${steps.join(',')}`);
+  await logAction('updated','document', id, n, `${docNum||''} | ${from} → ${to}`);
   toast('✅ ແກ້ໄຂເອກະສານສຳເລັດ!');
   document.getElementById('editDocForm').style.display = 'none';
   loadDocs();
@@ -1911,23 +1942,56 @@ async function deleteDoc(id) {
   loadDocs();
 }
 
+// ════ DOC NUMBER GENERATOR ════
+async function generateDocNumber() {
+  const dir    = document.getElementById('dDir')?.value || 'in';
+  const prefix = dir === 'in' ? 'ຂຂ' : 'ຂອ';
+  const year   = new Date().getFullYear();
+
+  // ດຶງ max number ຂອງ series ນີ້ ໃນປີນີ້
+  const { data } = await db.from('documents')
+    .select('doc_number')
+    .eq('doc_direction', dir)
+    .like('doc_number', `%/${year}`)
+    .order('created_at', {ascending: false})
+    .limit(50);
+
+  let maxNum = 0;
+  (data||[]).forEach(r => {
+    const m = (r.doc_number||'').match(/(\d+)\//);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+  });
+
+  const next = String(maxNum + 1).padStart(3, '0');
+  const numEl = document.getElementById('dNumber');
+  if (numEl) numEl.value = `${prefix}-${next}/${year}`;
+}
+
 async function saveDoc() {
   const n = document.getElementById('dName').value.trim();
   if(!n){toast('⚠️ ໃສ່ຊື່ເອກະສານ');return;}
-  const tp = document.getElementById('dType').value.split(' ')[0];
+  const tp       = document.getElementById('dType').value.split(' ')[0];
   const rawSteps = document.getElementById('dSteps').value;
-  const steps = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
-  const fromRaw = document.getElementById('dFrom').value.trim();
-  const created_by = fromRaw || myEmailPrefix() || '—';
+  const steps    = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
+  const fromRaw  = document.getElementById('dFrom').value.trim();
+  const created_by  = fromRaw || myEmailPrefix() || '—';
+  const doc_number  = document.getElementById('dNumber').value.trim() || null;
+  const doc_direction = document.getElementById('dDir').value || 'in';
+
   const {error} = await db.from('documents').insert({
-    name:n, doc_type:tp,
-    created_by,
-    sent_to:document.getElementById('dTo').value||'—',
-    steps:steps, current_step:0
+    name:n, doc_type:tp, created_by,
+    sent_to: document.getElementById('dTo').value||'—',
+    steps, current_step:0,
+    doc_number, doc_direction
   });
   if(error){toast('❌ '+error.message);return;}
   await logAction('created','document', 0, n,
-    `ສ້າງໂດຍ: ${created_by} → ${document.getElementById('dTo').value}`);
+    `${doc_direction==='in'?'ຂາເຂົ້າ':'ຂາອອກ'} ${doc_number||''} | ${created_by} → ${document.getElementById('dTo').value}`);
+  toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
+  toggleForm('addDocForm');
+  ['dName','dTo','dNumber'].forEach(id=>document.getElementById(id).value='');
+  loadDocs();
+}
   toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
   toggleForm('addDocForm');
   ['dName','dFrom','dTo'].forEach(id=>document.getElementById(id).value='');
