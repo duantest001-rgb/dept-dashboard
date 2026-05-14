@@ -248,6 +248,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   <div class="page active" id="page-dash">
     <div class="metrics" id="metricsBar"><div class="spinner">ໂຫຼດ...</div></div>
     <div id="blockerAlert"></div>
+    <div id="meetStatusAlert"></div>
     <div class="row2">
       <div class="card">
         <div class="card-title"><i class="ti ti-flame" style="color:var(--c4)"></i> ວຽກດ່ວນ</div>
@@ -1408,6 +1409,39 @@ async function loadDash() {
   document.getElementById('blockerAlert').innerHTML = blk>0
     ? `<div class="alert warn"><i class="ti ti-alert-triangle"></i> ວຽກຕິດຂັດ ${blk} ລາຍການ — ຕ້ອງການການຕັດສິນໃຈ</div>` : '';
 
+  // ── ກອງປະຊຸມກາຍມື້ ຍັງບໍ່ໄດ້ຢືນຢັນສະຖານະ ──────────────
+  const todayStr = new Date().toISOString().slice(0,10);
+  const pendMeets = allMeets.filter(m =>
+    m.meet_date &&
+    m.meet_date < todayStr &&
+    (!m.meet_status || m.meet_status === 'scheduled')
+  );
+  const meetAlertEl = document.getElementById('meetStatusAlert');
+  if (pendMeets.length > 0) {
+    meetAlertEl.innerHTML = `
+      <div class="card" style="border:1.5px solid #FAC775;background:#FFFBF2;margin-bottom:1rem">
+        <div class="card-title" style="color:#854F0B;margin-bottom:8px">
+          <i class="ti ti-clock-exclamation"></i> ກອງປະຊຸມກາຍມື້ — ຕ້ອງກວດສະຖານະ
+        </div>
+        ${pendMeets.map(m => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #FAC775">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">${m.title}</div>
+              <div style="font-size:11px;color:#854F0B;margin-top:2px">
+                <i class="ti ti-calendar" style="font-size:11px"></i> ${m.meet_date} ${m.meet_time||''} · ${m.location||'—'}
+              </div>
+            </div>
+            <div style="display:flex;gap:5px;flex-shrink:0">
+              <button onclick="quickConfirmMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;cursor:pointer;color:#0F6E56;font-weight:500">✅ ແລ້ວ</button>
+              <button onclick="quickPostponeMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #FAC775;background:#FFF3CD;border-radius:6px;cursor:pointer;color:#856404">⏩ ເລື່ອນ</button>
+              <button onclick="quickCancelMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;cursor:pointer;color:#993C1D">🚫 ຍົກເລີກ</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } else {
+    meetAlertEl.innerHTML = '';
+  }
+
   const urgent = allTasks.filter(t=>t.priority==='urgent');
   document.getElementById('urgentPreview').innerHTML = urgent.length===0
     ? '<div class="empty">✅ ບໍ່ມີວຽກດ່ວນ</div>'
@@ -2146,6 +2180,32 @@ async function saveEditMeet() {
   loadMeet();
 }
 
+async function quickConfirmMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  const {error} = await db.from('meetings').update({meet_status:'done'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','meeting', id, m?.title||'', 'meet_status → done (dashboard)');
+  toast('✅ ຢືນຢັນປະຊຸມແລ້ວ!');
+  loadDash();
+}
+
+async function quickCancelMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  if (!confirm(`ຢືນຢັນຍົກເລີກ "${m?.title||''}"?`)) return;
+  const {error} = await db.from('meetings').update({meet_status:'cancelled'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','meeting', id, m?.title||'', 'meet_status → cancelled (dashboard)');
+  toast('🚫 ຍົກເລີກນັດໝາຍແລ້ວ');
+  loadDash();
+}
+
+function quickPostponeMeet(id) {
+  // ເປີດ postpone modal ເດີມ ແລ້ວ callback ໄປ loadDash
+  openPostponeMeet(id);
+  // override save to also refresh dash
+  window._postponeFromDash = true;
+}
+
 async function confirmMeet(id) {
   const m = allMeets.find(x=>x.id===id);
   if (!confirm(`ຢືນຢັນວ່າ "${m?.title||''}" ໄດ້ປະຊຸມແລ້ວ?`)) return;
@@ -2220,7 +2280,12 @@ async function savePostponeMeet() {
     toast('⏩ ໝາຍວ່າເລື່ອນແລ້ວ');
   }
   closePostponeMeet();
-  loadMeet();
+  if (window._postponeFromDash) {
+    window._postponeFromDash = false;
+    loadDash();
+  } else {
+    loadMeet();
+  }
 }
 
 async function deleteMeet(id) {
