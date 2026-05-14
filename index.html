@@ -526,6 +526,15 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row" style="margin-bottom:0"><label>ວັນທີ ຮອດ</label>
           <input type="date" id="mSearchTo" onchange="renderMeet()" style="font-size:12px;padding:5px 8px">
         </div>
+        <div class="form-row" style="margin-bottom:0"><label>ສະຖານະ</label>
+          <select id="mFilterStatus" onchange="renderMeet()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">ທັງໝົດ</option>
+            <option value="scheduled">📅 ກຳນົດໄວ້</option>
+            <option value="done">✅ ແລ້ວ</option>
+            <option value="cancelled">🚫 ຍົກເລີກ</option>
+            <option value="postponed">⏩ ເລື່ອນ</option>
+          </select>
+        </div>
         <div class="form-row" style="margin-bottom:0"><label>ສະຖານທີ</label>
           <input type="text" id="mSearchLoc" placeholder="ຫ້ອງ / Online..." oninput="renderMeet()" style="font-size:12px;padding:5px 8px">
         </div>
@@ -698,6 +707,32 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <hr style="border:none;border-top:1px solid var(--border);margin-bottom:16px">
       <div id="dhTimeline"></div>
       <div id="dhFooter" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+    </div>
+  </div>
+
+  <!-- ── POSTPONE MEET MODAL ── -->
+  <div id="postponeMeetModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+    <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:min(400px,92vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+      <button onclick="closePostponeMeet()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px">⏩ ເລື່ອນນັດໝາຍ</div>
+      <div id="pmTitle" style="font-size:12px;color:var(--muted);margin-bottom:14px;padding:4px 8px;background:var(--bg2);border-radius:5px"></div>
+      <input type="hidden" id="pmId">
+      <div class="form-row">
+        <label>ວັນທີໃໝ່ *</label>
+        <input type="date" id="pmDate" style="font-size:13px;padding:7px 10px">
+      </div>
+      <div class="form-row">
+        <label>ເວລາໃໝ່</label>
+        <input type="time" id="pmTime" style="font-size:13px;padding:7px 10px">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--c2l);border-radius:8px;margin-bottom:14px">
+        <input type="checkbox" id="pmCreate" checked style="width:16px;height:16px;accent-color:var(--c2);cursor:pointer">
+        <label for="pmCreate" style="font-size:13px;color:var(--c2m);cursor:pointer;font-weight:500">ສ້າງນັດໝາຍໃໝ່ອັດຕະໂນມັດຈາກວັນທີທີ່ເລືອກ</label>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="savePostponeMeet()" style="flex:1;padding:9px;background:var(--c3);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:500">⏩ ຢືນຢັນເລື່ອນ</button>
+        <button onclick="closePostponeMeet()" style="padding:9px 14px;border:1px solid var(--border);background:var(--bg);border-radius:6px;font-size:13px;cursor:pointer;color:var(--muted)">ຍົກເລີກ</button>
+      </div>
     </div>
   </div>
 
@@ -2005,11 +2040,18 @@ function renderMeet() {
   const toD     = document.getElementById('mSearchTo')?.value||'';
   const locQ    = (document.getElementById('mSearchLoc')?.value||'').toLowerCase();
   const typeQ   = document.getElementById('mFilterType')?.value||'';
+  const statQ   = document.getElementById('mFilterStatus')?.value||'';
   const typeMap = {
     'ກອງປະຊຸມ': {icon:'🏛️', bg:'#E6F1FB', color:'#185FA5'},
     'ນັດໝາຍ':   {icon:'🤝', bg:'#E1F5EE', color:'#0F6E56'},
     'ກິດຈະກຳ':  {icon:'🎯', bg:'#FAECE7', color:'#993C1D'},
     'ອົບຮົມ':   {icon:'📚', bg:'#F5EEF8', color:'#6C3483'},
+  };
+  const statusMap = {
+    scheduled: {label:'📅 ກຳນົດໄວ້', bg:'#E6F1FB', color:'#185FA5'},
+    done:      {label:'✅ ແລ້ວ',      bg:'#E1F5EE', color:'#0F6E56'},
+    cancelled: {label:'🚫 ຍົກເລີກ',   bg:'#F8D7DA', color:'#721C24'},
+    postponed: {label:'⏩ ເລື່ອນ',    bg:'#FFF3CD', color:'#856404'},
   };
   let meets = allMeets;
   if (q)     meets = meets.filter(m => m.title.toLowerCase().includes(q));
@@ -2017,25 +2059,48 @@ function renderMeet() {
   if (toD)   meets = meets.filter(m => m.meet_date && m.meet_date <= toD);
   if (locQ)  meets = meets.filter(m => (m.location||'').toLowerCase().includes(locQ));
   if (typeQ) meets = meets.filter(m => (m.meet_type||'ກອງປະຊຸມ') === typeQ);
+  if (statQ) meets = meets.filter(m => (m.meet_status||'scheduled') === statQ);
+
   document.getElementById('meetList').innerHTML = meets.length===0
     ? '<div class="empty">ບໍ່ພົບລາຍການ</div>'
     : meets.map(m=>{
       const att = m.attendees||[];
       const avatars = att.map((a,i)=>`<div class="avatar" style="background:${acBg[i%5]};color:${acText[i%5]}">${a}</div>`).join('');
-      const tp = m.meet_type||'ກອງປະຊຸມ';
-      const tm = typeMap[tp]||{icon:'📅', bg:'#F1EFE8', color:'#5F5E5A'};
-      return `<div class="meeting-item">
-        <div class="meet-date"><div class="md">${m.meet_date ? m.meet_date.slice(5) : '—'}</div><div class="mt">${m.meet_time||'—'}</div></div>
+      const tp  = m.meet_type||'ກອງປະຊຸມ';
+      const tm  = typeMap[tp]||{icon:'📅', bg:'#F1EFE8', color:'#5F5E5A'};
+      const st  = m.meet_status||'scheduled';
+      const sm  = statusMap[st]||statusMap.scheduled;
+      const isDone      = st === 'done';
+      const isCancelled = st === 'cancelled';
+      const isPostponed = st === 'postponed';
+      const opacity = (isCancelled||isPostponed) ? 'opacity:0.65;' : '';
+
+      return `<div class="meeting-item" style="${opacity}">
+        <div class="meet-date" style="${isCancelled?'background:#F8D7DA':isPostponed?'background:#FFF3CD':''}">
+          <div class="md" style="${isCancelled?'color:#721C24':isPostponed?'color:#856404':''}">${m.meet_date ? m.meet_date.slice(5) : '—'}</div>
+          <div class="mt" style="${isCancelled?'color:#721C24':isPostponed?'color:#856404':''}">${m.meet_time||'—'}</div>
+        </div>
         <div class="meet-info">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">
             <span style="background:${tm.bg};color:${tm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${tm.icon} ${tp}</span>
+            <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${sm.label}</span>
           </div>
-          <div class="meet-title">${m.title}</div>
-          <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location}${m.notes?' · '+m.notes:''}</div>
+          <div class="meet-title" style="${isDone?'text-decoration:line-through;color:var(--muted)':''}">${m.title}</div>
+          <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location||'—'}${m.notes?' · '+m.notes:''}</div>
           <div class="attendees">${avatars}</div>
           <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-            ${canEdit()?`<button onclick="openEditMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>`:''}
-            ${canDelete()?`<button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>`:''}
+            ${!isDone && !isCancelled && !isPostponed && isSuperior()
+              ? `<button onclick="confirmMeet(${m.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ຢືນຢັນແລ້ວ</button>` : ''}
+            ${!isDone && !isCancelled && !isPostponed && isSuperior()
+              ? `<button onclick="openPostponeMeet(${m.id})" style="border:1px solid #FAC775;background:#FFF3CD;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#856404">⏩ ເລື່ອນ</button>` : ''}
+            ${!isDone && !isCancelled && !isPostponed && isSuperior()
+              ? `<button onclick="cancelMeet(${m.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">🚫 ຍົກເລີກ</button>` : ''}
+            ${(isCancelled||isPostponed||isDone) && isSuperior()
+              ? `<button onclick="restoreMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
+            ${canEdit() && !isCancelled
+              ? `<button onclick="openEditMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
+            ${canDelete()
+              ? `<button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -2081,6 +2146,83 @@ async function saveEditMeet() {
   loadMeet();
 }
 
+async function confirmMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  if (!confirm(`ຢືນຢັນວ່າ "${m?.title||''}" ໄດ້ປະຊຸມແລ້ວ?`)) return;
+  const {error} = await db.from('meetings').update({meet_status:'done'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','meeting', id, m?.title||'', 'meet_status → done');
+  toast('✅ ຢືນຢັນປະຊຸມແລ້ວ!');
+  loadMeet();
+}
+
+async function cancelMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  if (!confirm(`ຢືນຢັນຍົກເລີກ "${m?.title||''}"?`)) return;
+  const {error} = await db.from('meetings').update({meet_status:'cancelled'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','meeting', id, m?.title||'', 'meet_status → cancelled');
+  toast('🚫 ຍົກເລີກນັດໝາຍແລ້ວ');
+  loadMeet();
+}
+
+async function restoreMeet(id) {
+  const {error} = await db.from('meetings').update({meet_status:'scheduled'}).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  toast('✅ ຟື້ນຟູນັດໝາຍແລ້ວ');
+  loadMeet();
+}
+
+function openPostponeMeet(id) {
+  const m = allMeets.find(x=>x.id===id);
+  if (!m) return;
+  document.getElementById('pmId').value    = id;
+  document.getElementById('pmTitle').textContent = m.title;
+  document.getElementById('pmDate').value  = '';
+  document.getElementById('pmTime').value  = m.meet_time||'';
+  document.getElementById('pmCreate').checked = true;
+  document.getElementById('postponeMeetModal').style.display = 'flex';
+}
+
+function closePostponeMeet() {
+  document.getElementById('postponeMeetModal').style.display = 'none';
+}
+
+async function savePostponeMeet() {
+  const id      = parseInt(document.getElementById('pmId').value);
+  const newDate = document.getElementById('pmDate').value;
+  const newTime = document.getElementById('pmTime').value;
+  const doCreate = document.getElementById('pmCreate').checked;
+  if (!newDate) { toast('⚠️ ເລືອກວັນທີໃໝ່ກ່ອນ'); return; }
+
+  const m = allMeets.find(x=>x.id===id);
+
+  // Mark original as postponed
+  await db.from('meetings').update({meet_status:'postponed'}).eq('id',id);
+  await logAction('updated','meeting', id, m?.title||'', `⏩ ເລື່ອນ → ${newDate}`);
+
+  if (doCreate) {
+    // Create new meeting with same details but new date
+    const {error} = await db.from('meetings').insert({
+      title:     m.title,
+      meet_date: newDate,
+      meet_time: newTime||m.meet_time||null,
+      location:  m.location,
+      notes:     m.notes,
+      attendees: m.attendees,
+      meet_type: m.meet_type,
+      meet_status: 'scheduled'
+    });
+    if (error) { toast('❌ '+error.message); return; }
+    await logAction('created','meeting', 0, m.title, `[ເລື່ອນຈາກ ${m.meet_date}] → ${newDate}`);
+    toast('⏩ ເລື່ອນ + ສ້າງນັດໃໝ່ສຳເລັດ!');
+  } else {
+    toast('⏩ ໝາຍວ່າເລື່ອນແລ້ວ');
+  }
+  closePostponeMeet();
+  loadMeet();
+}
+
 async function deleteMeet(id) {
   if(!confirm('ຢືນຢັນລຶບກອງປະຊຸມນີ້?')) return;
   const meet = allMeets.find(m=>m.id===id);
@@ -2099,7 +2241,7 @@ function clearDocSearch() {
 }
 
 function clearMeetSearch() {
-  ['meetSearch','mSearchFrom','mSearchTo','mSearchLoc','mFilterType'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['meetSearch','mSearchFrom','mSearchTo','mSearchLoc','mFilterType','mFilterStatus'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderMeet();
 }
 
