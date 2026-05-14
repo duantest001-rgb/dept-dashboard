@@ -1992,12 +1992,6 @@ async function saveDoc() {
   ['dName','dTo','dNumber'].forEach(id=>document.getElementById(id).value='');
   loadDocs();
 }
-  toast('✅ ເພີ່ມເອກະສານສຳເລັດ!');
-  toggleForm('addDocForm');
-  ['dName','dFrom','dTo'].forEach(id=>document.getElementById(id).value='');
-  loadDocs();
-}
-
 // ════ MEETINGS ════
 async function loadMeet() {
   const {data} = await db.from('meetings').select('*').order('meet_date');
