@@ -1432,9 +1432,11 @@ async function loadDash() {
               </div>
             </div>
             <div style="display:flex;gap:5px;flex-shrink:0">
+              ${isSuperior() ? `
               <button onclick="quickConfirmMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;cursor:pointer;color:#0F6E56;font-weight:500">✅ ແລ້ວ</button>
               <button onclick="quickPostponeMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #FAC775;background:#FFF3CD;border-radius:6px;cursor:pointer;color:#856404">⏩ ເລື່ອນ</button>
               <button onclick="quickCancelMeet(${m.id})" style="font-size:11px;padding:3px 8px;border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;cursor:pointer;color:#993C1D">🚫 ຍົກເລີກ</button>
+              ` : `<span style="font-size:11px;color:#856404;font-style:italic">ລໍຖ້າຫົວໜ້າຢືນຢັນ</span>`}
             </div>
           </div>`).join('')}
       </div>`;
@@ -1458,13 +1460,19 @@ async function loadDash() {
         <br><span style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${(d.steps||[])[d.current_step]||'—'}</span>
       </div>`).join('');
 
-  const next2 = [...allMeets].sort((a,b)=>{
-    const ad = (a.meet_date||'9999')+(a.meet_time||'');
-    const bd = (b.meet_date||'9999')+(b.meet_time||'');
-    return ad > bd ? 1 : -1;
-  }).slice(0,2);
+  const todayForMeet = new Date().toISOString().slice(0,10);
+  const next2 = [...allMeets]
+    .filter(m =>
+      m.meet_date >= todayForMeet &&
+      (!m.meet_status || m.meet_status === 'scheduled')
+    )
+    .sort((a,b)=>{
+      const ad = (a.meet_date||'9999')+(a.meet_time||'');
+      const bd = (b.meet_date||'9999')+(b.meet_time||'');
+      return ad > bd ? 1 : -1;
+    }).slice(0,2);
   document.getElementById('meetPreview').innerHTML = next2.length===0
-    ? '<div class="empty">ບໍ່ມີກອງປະຊຸມ</div>'
+    ? '<div class="empty">ບໍ່ມີກອງປະຊຸມທີ່ກຳນົດໄວ້</div>'
     : next2.map(m=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
         <i class="ti ti-calendar-event" style="color:var(--c2);font-size:13px"></i> <strong>${m.title}</strong>
         <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date||'ບໍ່ກຳນົດ'} ${m.meet_time||''} · ${m.location}</span>
