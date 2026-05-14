@@ -408,6 +408,14 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <input type="text" id="docSearch" placeholder="ຄົ້ນຫາຊື່ເອກະສານ..." oninput="renderDocs()" style="width:100%;padding:8px 12px 8px 32px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit">
       </div>
       <div class="search-grid">
+        <div class="form-row" style="margin-bottom:0"><label>ທິດທາງ</label>
+          <select id="dSearchDir" onchange="renderDocs()" style="font-size:12px;padding:5px 8px">
+            <option value="">ທັງໝົດ</option>
+            <option value="in">📥 ຂາເຂົ້າ</option>
+            <option value="out">📤 ຂາອອກ</option>
+            <option value="internal">📋 ພາຍໃນ</option>
+          </select>
+        </div>
         <div class="form-row" style="margin-bottom:0"><label>ສ້າງໂດຍ</label>
           <input type="text" id="dSearchFrom" placeholder="ຊື່ຜູ້ສ້າງ..." oninput="renderDocs()" style="font-size:12px;padding:5px 8px">
         </div>
@@ -442,6 +450,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
           <select id="dDir" onchange="generateDocNumber()" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
             <option value="in">📥 ຂາເຂົ້າ</option>
             <option value="out">📤 ຂາອອກ</option>
+            <option value="internal">📋 ພາຍໃນ</option>
           </select>
         </div>
         <div class="form-row"><label>ເລກທີ <span style="font-size:10px;color:var(--muted)">(auto, ແກ້ໄດ້)</span></label>
@@ -474,6 +483,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
           <select id="eDDir" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
             <option value="in">📥 ຂາເຂົ້າ</option>
             <option value="out">📤 ຂາອອກ</option>
+            <option value="internal">📋 ພາຍໃນ</option>
           </select>
         </div>
         <div class="form-row"><label>ເລກທີ</label>
@@ -1737,10 +1747,12 @@ function renderDocs() {
   const fromQ    = (document.getElementById('dSearchFrom')?.value||'').toLowerCase();
   const typeQ    = document.getElementById('dSearchType')?.value||'';
   const statusQ  = document.getElementById('dSearchStatus')?.value||'';
+  const dirQ    = document.getElementById('dSearchDir')?.value||'';
   let docs = allDocs;
   if (q)       docs = docs.filter(d => d.name.toLowerCase().includes(q));
   if (fromQ)   docs = docs.filter(d => (d.created_by||'').toLowerCase().includes(fromQ));
   if (typeQ)   docs = docs.filter(d => d.doc_type === typeQ);
+  if (dirQ)    docs = docs.filter(d => (d.doc_direction||'in') === dirQ);
   if (statusQ === 'done')       docs = docs.filter(d => d.doc_status === 'done' || d.current_step >= (d.steps||[]).length-1);
   if (statusQ === 'inprogress') docs = docs.filter(d => !d.doc_status || d.doc_status === 'inprogress');
   if (statusQ === 'cancelled')  docs = docs.filter(d => d.doc_status === 'cancelled');
@@ -1787,7 +1799,16 @@ function renderDocs() {
         <div class="doc-icon">${d.doc_type}</div>
         <div class="doc-info">
           <div class="doc-name" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            ${d.doc_number ? `<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;background:${d.doc_direction==='in'?'#E6F1FB':'#E1F5EE'};color:${d.doc_direction==='in'?'#185FA5':'#0F6E56'};padding:2px 8px;border-radius:6px;border:1px solid ${d.doc_direction==='in'?'#B5D4F4':'#9FE1CB'}">${d.doc_direction==='in'?'📥':'📤'} ${d.doc_number}</span>` : `<span style="font-size:10px;color:var(--muted);font-style:italic">${d.doc_direction==='out'?'📤 ຂາອອກ':'📥 ຂາເຂົ້າ'}</span>`}
+            ${d.doc_number ? (() => {
+              const dirCfg = {
+                in:       {icon:'📥', bg:'#E6F1FB', color:'#185FA5', border:'#B5D4F4'},
+                out:      {icon:'📤', bg:'#E1F5EE', color:'#0F6E56', border:'#9FE1CB'},
+                internal: {icon:'📋', bg:'#FAEEDA', color:'#854F0B', border:'#FAC775'},
+              }[d.doc_direction||'in'] || {icon:'📄', bg:'#F1EFE8', color:'#5F5E5A', border:'#DDD'};
+              return `<span style="font-family:var(--font-mono);font-size:11px;font-weight:600;background:${dirCfg.bg};color:${dirCfg.color};padding:2px 8px;border-radius:6px;border:1px solid ${dirCfg.border}">${dirCfg.icon} ${d.doc_number}</span>`;
+            })() : `<span style="font-size:10px;color:var(--muted);font-style:italic">
+              ${{in:'📥 ຂາເຂົ້າ', out:'📤 ຂາອອກ', internal:'📋 ພາຍໃນ'}[d.doc_direction||'in']||'📄'}
+            </span>`}
             ${d.name} ${statusBadge[docStatus]||statusBadge.inprogress}
           </div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
@@ -2022,10 +2043,9 @@ async function deleteDoc(id) {
 // ════ DOC NUMBER GENERATOR ════
 async function generateDocNumber() {
   const dir    = document.getElementById('dDir')?.value || 'in';
-  const prefix = dir === 'in' ? 'ຂຂ' : 'ຂອ';
+  const prefix = {in:'ຂຂ', out:'ຂອ', internal:'ພນ'}[dir] || 'ຂຂ';
   const year   = new Date().getFullYear();
 
-  // ດຶງ max number ຂອງ series ນີ້ ໃນປີນີ້
   const { data } = await db.from('documents')
     .select('doc_number')
     .eq('doc_direction', dir)
@@ -2307,7 +2327,7 @@ async function deleteMeet(id) {
 }
 
 function clearDocSearch() {
-  ['docSearch','dSearchFrom'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['docSearch','dSearchFrom','dSearchDir'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const dt=document.getElementById('dSearchType'); if(dt) dt.value='';
   const ds=document.getElementById('dSearchStatus'); if(ds) ds.value='';
   renderDocs();
