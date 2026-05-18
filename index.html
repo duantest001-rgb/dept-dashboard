@@ -654,8 +654,10 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
           </select>
         </div>
         <div class="form-row">
-          <label>ຊື່ພະນັກງານ</label>
-          <input type="text" id="lOwner" placeholder="ຊື່ ຫຼື Email prefix">
+          <label>ພະນັກງານ</label>
+          <select id="lOwner" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">⏳ ກຳລັງໂຫຼດ...</option>
+          </select>
         </div>
         <div class="form-row">
           <label>ວັນທີເລີ່ມ</label>
@@ -689,8 +691,10 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
           </select>
         </div>
         <div class="form-row">
-          <label>ຊື່ພະນັກງານ</label>
-          <input type="text" id="eLOwner" placeholder="ຊື່ ຫຼື Email prefix">
+          <label>ພະນັກງານ</label>
+          <select id="eLOwner" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+            <option value="">⏳ ກຳລັງໂຫຼດ...</option>
+          </select>
         </div>
         <div class="form-row">
           <label>ວັນທີເລີ່ມ</label>
@@ -2478,7 +2482,20 @@ const leaveStatusMap = {
   rejected: { label:'❌ ປະຕິເສດ',    bg:'#FAECE7', color:'#993C1D' },
 };
 
+async function populateLeaveOwnerDropdowns() {
+  const users = await loadUserOptions();
+  const meVal = myEmailPrefix();
+  const opts = users.map(u =>
+    `<option value="${u.value}" ${u.value===meVal?'selected':''}>${u.label}</option>`
+  ).join('');
+  ['lOwner','eLOwner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = opts;
+  });
+}
+
 async function loadLeave() {
+  await populateLeaveOwnerDropdowns();
   const { data } = await db.from('leaves').select('*').order('date_from', { ascending: true });
   allLeaves = data || [];
   renderLeave();
@@ -2588,13 +2605,14 @@ async function saveLeave() {
   await logAction('created','leave',0, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo}`);
   toast('✅ ສົ່ງຄຳຂໍສຳເລັດ!');
   toggleForm('addLeaveForm');
-  ['lOwner','lFrom','lTo','lReason'].forEach(id => document.getElementById(id).value='');
+  ['lFrom','lTo','lReason'].forEach(id => document.getElementById(id).value='');
   loadLeave();
 }
 
-function openEditLeave(id) {
+async function openEditLeave(id) {
   const l = allLeaves.find(x=>x.id===id);
   if (!l) return;
+  await populateLeaveOwnerDropdowns();
   document.getElementById('editLeaveId').value = id;
   document.getElementById('eLType').value      = l.leave_type;
   document.getElementById('eLOwner').value     = l.owner||'';
