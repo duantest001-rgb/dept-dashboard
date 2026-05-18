@@ -53,6 +53,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 .spinner{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
 .spinner::after{content:'';display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--c2);border-radius:50%;animation:spin .7s linear infinite;margin-left:8px;vertical-align:middle}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .empty{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
 
 /* ── Task items ── */
@@ -617,6 +618,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <select id="lFilterStatus" onchange="renderLeave()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
           <option value="">📋 ທຸກສະຖານະ</option>
+          <option value="active">🟢 ກຳລັງລາ</option>
           <option value="pending">⏳ ລໍຖ້າອະນຸມັດ</option>
           <option value="approved">✅ ອະນຸມັດແລ້ວ</option>
           <option value="rejected">❌ ປະຕິເສດ</option>
@@ -631,6 +633,15 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         </select>
         <button class="btn-outline" onclick="toggleForm('addLeaveForm')"><i class="ti ti-plus"></i> ຂໍລາ/ຄອບ</button>
       </div>
+    </div>
+
+    <!-- Leave Balance Card -->
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span><i class="ti ti-wallet" style="color:var(--c1)"></i> ວັນລາຄົງເຫຼືອ (ປີນີ້)</span>
+        <button onclick="openBalanceModal()" style="font-size:11px;padding:4px 10px;border:1px solid var(--c2);color:var(--c2m);background:var(--c2l);border-radius:6px;cursor:pointer"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
+      </div>
+      <div id="leaveBalanceArea"><div class="spinner">ໂຫຼດ...</div></div>
     </div>
 
     <!-- Calendar highlight strip -->
@@ -714,6 +725,40 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
     <!-- List -->
     <div class="card"><div id="leaveList"><div class="spinner">ໂຫຼດ...</div></div></div>
+  </div>
+
+  <!-- ── LEAVE BALANCE MODAL ── -->
+  <div id="balanceModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center">
+    <div style="background:var(--card);border-radius:var(--radius-lg);padding:1.5rem;width:90%;max-width:420px;position:relative;max-height:90vh;overflow-y:auto">
+      <button onclick="closeBalanceModal()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px"><i class="ti ti-wallet"></i> ຕັ້ງຄ່າວັນລາ</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">ໃສ່ຈຳນວນວັນລາທີ່ໄດ້ຮັບ ແລະ ທີ່ໃຊ້ໄປ</div>
+      <div class="form-row">
+        <label>ພະນັກງານ</label>
+        <select id="balOwner" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%" onchange="loadBalanceForUser()">
+          <option value="">ເລືອກພະນັກງານ...</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
+        <div class="form-row" style="margin-bottom:0">
+          <label>ວັນທີ່ໄດ້ (ທັງໝົດ)</label>
+          <input type="number" id="balTotal" min="0" max="365" placeholder="15" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label>ໃຊ້ໄປແລ້ວ</label>
+          <input type="number" id="balUsed" min="0" max="365" placeholder="0" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
+        </div>
+        <div class="form-row" style="margin-bottom:0">
+          <label style="color:var(--c1m)">ຍັງເຫຼືອ</label>
+          <input type="number" id="balRemain" readonly style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--c1);background:var(--c1l);color:var(--c1m);font-size:13px;width:100%;font-weight:700">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">* ວັນທີ່ຍັງເຫຼືອ = ທັງໝົດ − ໃຊ້ໄປ (ຄຳນວນອັດຕະໂນມັດ)</div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button onclick="saveBalance()" style="flex:1;padding:9px;background:var(--c1);color:#fff;border:none;border-radius:var(--radius);font-size:13px;cursor:pointer;font-weight:600">💾 ບັນທຶກ</button>
+        <button onclick="closeBalanceModal()" style="padding:9px 14px;border:1px solid var(--border);background:var(--bg);border-radius:var(--radius);font-size:13px;cursor:pointer;color:var(--muted)">ຍົກເລີກ</button>
+      </div>
+    </div>
   </div>
 
   <!-- ── ACTIVITY LOG ── -->
@@ -2477,9 +2522,10 @@ const leaveTypeMap = {
   other:    { icon:'📝', label:'ອື່ນໆ',          bg:'#F1EFE8', color:'#5F5E5A' },
 };
 const leaveStatusMap = {
-  pending:  { label:'⏳ ລໍຖ້າ',       bg:'#FFF3CD', color:'#856404' },
-  approved: { label:'✅ ອະນຸມັດ',     bg:'#E1F5EE', color:'#0F6E56' },
-  rejected: { label:'❌ ປະຕິເສດ',    bg:'#FAECE7', color:'#993C1D' },
+  pending:  { label:'⏳ ລໍຖ້າ',        bg:'#FFF3CD', color:'#856404' },
+  approved: { label:'✅ ອະນຸມັດ',      bg:'#E1F5EE', color:'#0F6E56' },
+  active:   { label:'🟢 ກຳລັງລາ',     bg:'#D1FAE5', color:'#065F46' },
+  rejected: { label:'❌ ປະຕິເສດ',     bg:'#FAECE7', color:'#993C1D' },
 };
 
 async function populateLeaveOwnerDropdowns() {
@@ -2494,13 +2540,29 @@ async function populateLeaveOwnerDropdowns() {
   });
 }
 
+// ຄຳນວນ display status — ຖ້າ approved ແລະ ວັນນີ້ຢູ່ໃນຊ່ວງ = "active"
+function getLeaveDisplayStatus(l) {
+  if (l.status !== 'approved') return l.status;
+  const todayStr = new Date().toISOString().slice(0,10);
+  if (l.date_from <= todayStr && l.date_to >= todayStr) return 'active';
+  return 'approved';
+}
+
+let allLeaveBalance = []; // [{owner, total_days, used_days}]
+
 async function loadLeave() {
   await populateLeaveOwnerDropdowns();
-  const { data } = await db.from('leaves').select('*').order('date_from', { ascending: true });
-  allLeaves = data || [];
+  const [lRes, bRes] = await Promise.all([
+    db.from('leaves').select('*').order('date_from', { ascending: true }),
+    db.from('leave_balance').select('*')
+  ]);
+  allLeaves       = lRes.data || [];
+  allLeaveBalance = bRes.data || [];
   renderLeave();
   renderLeaveCalStrip();
+  renderLeaveBalance();
 }
+
 
 function renderLeaveCalStrip() {
   const today = new Date();
@@ -2523,10 +2585,11 @@ function renderLeaveCalStrip() {
 
   el.innerHTML = upcoming.map(l => {
     const tm = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
-    const sm = leaveStatusMap[l.status]   || leaveStatusMap.pending;
+    const dStatus = getLeaveDisplayStatus(l);
+    const sm = leaveStatusMap[dStatus] || leaveStatusMap.approved;
     const days = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
-    const isToday = l.date_from <= todayStr && l.date_to >= todayStr;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${isToday?'background:var(--c1l);margin:0 -1.25rem;padding:9px 1.25rem;':''}">
+    const isActive = dStatus === 'active';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${isActive?'background:var(--c1l);margin:0 -1.25rem;padding:9px 1.25rem;':''}">
       <div style="min-width:52px;text-align:center;background:${tm.bg};border-radius:var(--radius);padding:6px 4px">
         <div style="font-size:18px">${tm.icon}</div>
         <div style="font-size:9px;color:${tm.color};font-weight:600">${tm.label}</div>
@@ -2539,7 +2602,7 @@ function renderLeaveCalStrip() {
         </div>
       </div>
       <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;flex-shrink:0">${sm.label}</span>
-      ${isToday ? '<span style="background:var(--c1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex-shrink:0">ມື້ນີ້</span>' : ''}
+      ${isActive ? '<span style="background:var(--c1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex-shrink:0">ມື້ນີ້</span>' : ''}
     </div>`;
   }).join('');
 }
@@ -2548,18 +2611,26 @@ function renderLeave() {
   const stQ   = document.getElementById('lFilterStatus')?.value || '';
   const typeQ = document.getElementById('lFilterType')?.value || '';
   let items = allLeaves;
-  if (stQ)   items = items.filter(l => l.status === stQ);
   if (typeQ) items = items.filter(l => l.leave_type === typeQ);
+  if (stQ) {
+    if (stQ === 'active') {
+      items = items.filter(l => getLeaveDisplayStatus(l) === 'active');
+    } else {
+      items = items.filter(l => l.status === stQ && getLeaveDisplayStatus(l) !== 'active');
+    }
+  }
 
   const el = document.getElementById('leaveList');
   if (!items.length) { el.innerHTML = '<div class="empty">ບໍ່ພົບລາຍການ</div>'; return; }
 
   el.innerHTML = items.map(l => {
-    const tm = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
-    const sm = leaveStatusMap[l.status]   || leaveStatusMap.pending;
-    const days = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
-    const isPending = l.status === 'pending';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">
+    const tm      = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
+    const dStatus = getLeaveDisplayStatus(l);
+    const sm      = leaveStatusMap[dStatus] || leaveStatusMap.pending;
+    const days    = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+    const isPending  = l.status === 'pending';
+    const isActive   = dStatus === 'active';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);${isActive?'background:var(--c1l);margin:0 -1.25rem;padding:11px 1.25rem;border-radius:var(--radius);margin-bottom:4px;':''}">
       <div style="min-width:48px;text-align:center;background:${tm.bg};border-radius:var(--radius);padding:6px 4px;flex-shrink:0">
         <div style="font-size:16px">${tm.icon}</div>
         <div style="font-size:9px;color:${tm.color};font-weight:600;margin-top:2px">${tm.label}</div>
@@ -2567,9 +2638,10 @@ function renderLeave() {
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
           <strong style="font-size:14px">${l.owner||'—'}</strong>
-          <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${sm.label}</span>
+          <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600">${sm.label}</span>
+          ${isActive ? `<span style="background:var(--c1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;animation:pulse 1.5s infinite">● ກຳລັງລາ</span>` : ''}
         </div>
-        <div style="font-size:12px;color:var(--muted)">📅 ${l.date_from}${l.date_from!==l.date_to?' → '+l.date_to:''} &nbsp;·&nbsp; ${days} ວັນ</div>
+        <div style="font-size:12px;color:var(--muted)">📅 ${l.date_from}${l.date_from!==l.date_to?' → '+l.date_to:''} &nbsp;·&nbsp; <strong>${days}</strong> ວັນ</div>
         ${l.reason ? `<div style="font-size:12px;color:var(--text);margin-top:3px">💬 ${l.reason}</div>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
           ${isPending && isSuperior() ? `
@@ -2667,6 +2739,110 @@ async function deleteLeave(id) {
   if (error) { toast('❌ '+error.message); return; }
   await logAction('deleted','leave', id, l?.owner||'', '');
   toast('🗑️ ລຶບສຳເລັດ');
+  loadLeave();
+}
+
+async function deleteLeave(id) {
+  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) return;
+  const l = allLeaves.find(x=>x.id===id);
+  const { error } = await db.from('leaves').delete().eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('deleted','leave', id, l?.owner||'', '');
+  toast('🗑️ ລຶບສຳເລັດ');
+  loadLeave();
+}
+
+// ── Leave Balance ──────────────────────────────
+function renderLeaveBalance() {
+  const el = document.getElementById('leaveBalanceArea');
+  if (!el) return;
+  // ຄຳນວນວັນທີ່ໃຊ້ຈາກ leaves table (approved/active only)
+  const usedByOwner = {};
+  allLeaves.forEach(l => {
+    if (l.status === 'approved' || getLeaveDisplayStatus(l) === 'active') {
+      const d = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+      usedByOwner[l.owner] = (usedByOwner[l.owner]||0) + d;
+    }
+  });
+
+  if (!allLeaveBalance.length) {
+    el.innerHTML = '<div class="empty" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນວັນລາ — ກົດ "ແກ້ໄຂ" ເພື່ອຕັ້ງຄ່າ</div>';
+    return;
+  }
+
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+    ${allLeaveBalance.map(b => {
+      const used    = b.used_days ?? usedByOwner[b.owner] ?? 0;
+      const total   = b.total_days ?? 15;
+      const remain  = Math.max(0, total - used);
+      const pct     = total > 0 ? Math.min(100, Math.round((used/total)*100)) : 0;
+      const color   = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
+      const bgColor = pct >= 90 ? '#FAECE7' : pct >= 60 ? '#FFF3CD' : '#E1F5EE';
+      return `<div style="background:${bgColor};border-radius:var(--radius);padding:10px 12px">
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">👤 ${b.owner}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ໃຊ້ ${used} / ${total} ວັນ</div>
+        <div style="height:5px;background:rgba(0,0,0,.1);border-radius:3px;overflow:hidden;margin-bottom:5px">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:18px;font-weight:700;color:${color}">${remain} <span style="font-size:10px;font-weight:400">ວັນຍັງເຫຼືອ</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function openBalanceModal() {
+  const users = await loadUserOptions();
+  const sel = document.getElementById('balOwner');
+  sel.innerHTML = '<option value="">ເລືອກພະນັກງານ...</option>' +
+    users.map(u => `<option value="${u.value}">${u.label}</option>`).join('');
+  document.getElementById('balTotal').value  = '';
+  document.getElementById('balUsed').value   = '';
+  document.getElementById('balRemain').value = '';
+  // auto-calc remain
+  ['balTotal','balUsed'].forEach(id => {
+    document.getElementById(id).oninput = () => {
+      const t = parseInt(document.getElementById('balTotal').value)||0;
+      const u = parseInt(document.getElementById('balUsed').value)||0;
+      document.getElementById('balRemain').value = Math.max(0,t-u);
+    };
+  });
+  document.getElementById('balanceModal').style.display = 'flex';
+}
+
+function closeBalanceModal() {
+  document.getElementById('balanceModal').style.display = 'none';
+}
+
+async function loadBalanceForUser() {
+  const owner = document.getElementById('balOwner').value;
+  if (!owner) return;
+  const existing = allLeaveBalance.find(b => b.owner === owner);
+  if (existing) {
+    document.getElementById('balTotal').value  = existing.total_days ?? 15;
+    document.getElementById('balUsed').value   = existing.used_days  ?? 0;
+    document.getElementById('balRemain').value = Math.max(0,(existing.total_days??15)-(existing.used_days??0));
+  } else {
+    document.getElementById('balTotal').value  = 15;
+    document.getElementById('balUsed').value   = 0;
+    document.getElementById('balRemain').value = 15;
+  }
+}
+
+async function saveBalance() {
+  const owner = document.getElementById('balOwner').value;
+  if (!owner) { toast('⚠️ ເລືອກພະນັກງານກ່ອນ'); return; }
+  const total = parseInt(document.getElementById('balTotal').value)||0;
+  const used  = parseInt(document.getElementById('balUsed').value)||0;
+  const existing = allLeaveBalance.find(b => b.owner === owner);
+  let error;
+  if (existing) {
+    ({ error } = await db.from('leave_balance').update({ total_days:total, used_days:used }).eq('owner', owner));
+  } else {
+    ({ error } = await db.from('leave_balance').insert({ owner, total_days:total, used_days:used }));
+  }
+  if (error) { toast('❌ '+error.message); return; }
+  toast('✅ ບັນທຶກວັນລາສຳເລັດ!');
+  closeBalanceModal();
   loadLeave();
 }
 
