@@ -672,12 +672,22 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         </div>
         <div class="form-row">
           <label>ວັນທີເລີ່ມ</label>
-          <input type="date" id="lFrom">
+          <input type="date" id="lFrom" onchange="calcLeaveDays()">
         </div>
         <div class="form-row">
           <label>ວັນທີສິ້ນສຸດ</label>
-          <input type="date" id="lTo">
+          <input type="date" id="lTo" onchange="calcLeaveDays()">
         </div>
+      </div>
+      <!-- half day + day count row -->
+      <div style="display:flex;align-items:center;gap:12px;margin:6px 0 2px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500">
+          <input type="checkbox" id="lHalf" onchange="calcLeaveDays()" style="width:15px;height:15px;cursor:pointer">
+          ເຄິ່ງວັນ (0.5 ວັນ)
+        </label>
+        <span style="font-size:12px;color:var(--muted)">ຈຳນວນ:
+          <strong id="lDaysPreview" style="color:var(--c1m);font-size:14px">—</strong> ວັນ
+        </span>
       </div>
       <div class="form-row"><label>ເຫດຜົນ / ໝາຍເຫດ</label><textarea id="lReason" placeholder="ລາຍລະອຽດ..."></textarea></div>
       <div class="btn-row">
@@ -709,12 +719,21 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         </div>
         <div class="form-row">
           <label>ວັນທີເລີ່ມ</label>
-          <input type="date" id="eLFrom">
+          <input type="date" id="eLFrom" onchange="calcLeaveDaysEdit()">
         </div>
         <div class="form-row">
           <label>ວັນທີສິ້ນສຸດ</label>
-          <input type="date" id="eLTo">
+          <input type="date" id="eLTo" onchange="calcLeaveDaysEdit()">
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin:6px 0 2px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500">
+          <input type="checkbox" id="eLHalf" onchange="calcLeaveDaysEdit()" style="width:15px;height:15px;cursor:pointer">
+          ເຄິ່ງວັນ (0.5 ວັນ)
+        </label>
+        <span style="font-size:12px;color:var(--muted)">ຈຳນວນ:
+          <strong id="eLDaysPreview" style="color:var(--c1m);font-size:14px">—</strong> ວັນ
+        </span>
       </div>
       <div class="form-row"><label>ເຫດຜົນ</label><textarea id="eLReason" placeholder="ລາຍລະອຽດ..."></textarea></div>
       <div class="btn-row">
@@ -742,11 +761,11 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px">
         <div class="form-row" style="margin-bottom:0">
           <label>ວັນທີ່ໄດ້ (ທັງໝົດ)</label>
-          <input type="number" id="balTotal" min="0" max="365" placeholder="15" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
+          <input type="number" id="balTotal" min="0" max="365" step="0.5" placeholder="15" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label>ໃຊ້ໄປແລ້ວ</label>
-          <input type="number" id="balUsed" min="0" max="365" placeholder="0" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
+          <input type="number" id="balUsed" min="0" max="365" step="0.5" placeholder="0" style="padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;width:100%">
         </div>
         <div class="form-row" style="margin-bottom:0">
           <label style="color:var(--c1m)">ຍັງເຫຼືອ</label>
@@ -2587,7 +2606,7 @@ function renderLeaveCalStrip() {
     const tm = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
     const dStatus = getLeaveDisplayStatus(l);
     const sm = leaveStatusMap[dStatus] || leaveStatusMap.approved;
-    const days = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+    const days = l.days_count ?? (Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1);
     const isActive = dStatus === 'active';
     return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${isActive?'background:var(--c1l);margin:0 -1.25rem;padding:9px 1.25rem;':''}">
       <div style="min-width:52px;text-align:center;background:${tm.bg};border-radius:var(--radius);padding:6px 4px">
@@ -2627,7 +2646,8 @@ function renderLeave() {
     const tm      = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
     const dStatus = getLeaveDisplayStatus(l);
     const sm      = leaveStatusMap[dStatus] || leaveStatusMap.pending;
-    const days    = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+    const days    = l.days_count ?? (Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1);
+    const halfBadge = l.half_day ? '<span style="font-size:9px;background:#EEEDFE;color:#534AB7;padding:1px 5px;border-radius:8px;font-weight:600">½</span>' : '';
     const isPending  = l.status === 'pending';
     const isActive   = dStatus === 'active';
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border);${isActive?'background:var(--c1l);margin:0 -1.25rem;padding:11px 1.25rem;border-radius:var(--radius);margin-bottom:4px;':''}">
@@ -2641,7 +2661,7 @@ function renderLeave() {
           <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600">${sm.label}</span>
           ${isActive ? `<span style="background:var(--c1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700;animation:pulse 1.5s infinite">● ກຳລັງລາ</span>` : ''}
         </div>
-        <div style="font-size:12px;color:var(--muted)">📅 ${l.date_from}${l.date_from!==l.date_to?' → '+l.date_to:''} &nbsp;·&nbsp; <strong>${days}</strong> ວັນ</div>
+        <div style="font-size:12px;color:var(--muted)">📅 ${l.date_from}${l.date_from!==l.date_to?' → '+l.date_to:''} &nbsp;·&nbsp; <strong>${days}</strong> ວັນ ${halfBadge}</div>
         ${l.reason ? `<div style="font-size:12px;color:var(--text);margin-top:3px">💬 ${l.reason}</div>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
           ${isPending && isSuperior() ? `
@@ -2665,19 +2685,24 @@ async function saveLeave() {
   const lType = document.getElementById('lType').value;
   const dFrom = document.getElementById('lFrom').value;
   const dTo   = document.getElementById('lTo').value;
+  const half  = document.getElementById('lHalf').checked;
   if (!dFrom || !dTo) { toast('⚠️ ເລືອກວັນທີເລີ່ມ ແລະ ສິ້ນສຸດ'); return; }
   if (dTo < dFrom)    { toast('⚠️ ວັນທີສິ້ນສຸດຕ້ອງ >= ວັນທີເລີ່ມ'); return; }
+  const daysCount = calcDays(dFrom, dTo, half);
   const { error } = await db.from('leaves').insert({
     owner, leave_type: lType,
     date_from: dFrom, date_to: dTo,
+    half_day: half, days_count: daysCount,
     reason: document.getElementById('lReason').value.trim(),
     status: 'pending'
   });
   if (error) { toast('❌ '+error.message); return; }
-  await logAction('created','leave',0, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo}`);
+  await logAction('created','leave',0, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo} (${daysCount}ວັນ)`);
   toast('✅ ສົ່ງຄຳຂໍສຳເລັດ!');
   toggleForm('addLeaveForm');
   ['lFrom','lTo','lReason'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('lHalf').checked = false;
+  document.getElementById('lDaysPreview').textContent = '—';
   loadLeave();
 }
 
@@ -2690,7 +2715,9 @@ async function openEditLeave(id) {
   document.getElementById('eLOwner').value     = l.owner||'';
   document.getElementById('eLFrom').value      = l.date_from;
   document.getElementById('eLTo').value        = l.date_to;
+  document.getElementById('eLHalf').checked    = l.half_day || false;
   document.getElementById('eLReason').value    = l.reason||'';
+  document.getElementById('eLDaysPreview').textContent = l.days_count ?? '—';
   const form = document.getElementById('editLeaveForm');
   form.style.display = 'block';
   form.scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -2702,13 +2729,16 @@ async function saveEditLeave() {
   const lType = document.getElementById('eLType').value;
   const dFrom = document.getElementById('eLFrom').value;
   const dTo   = document.getElementById('eLTo').value;
+  const half  = document.getElementById('eLHalf').checked;
   if (!dFrom||!dTo) { toast('⚠️ ເລືອກວັນທີ'); return; }
+  const daysCount = calcDays(dFrom, dTo, half);
   const { error } = await db.from('leaves').update({
     owner, leave_type: lType, date_from: dFrom, date_to: dTo,
+    half_day: half, days_count: daysCount,
     reason: document.getElementById('eLReason').value.trim()
   }).eq('id', id);
   if (error) { toast('❌ '+error.message); return; }
-  await logAction('updated','leave', id, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo}`);
+  await logAction('updated','leave', id, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo} (${daysCount}ວັນ)`);
   toast('✅ ແກ້ໄຂສຳເລັດ!');
   document.getElementById('editLeaveForm').style.display='none';
   loadLeave();
@@ -2752,7 +2782,31 @@ async function deleteLeave(id) {
   loadLeave();
 }
 
-// ── Leave Balance ──────────────────────────────
+// ── ຄຳນວນຈຳນວນວັນລາ (ຮອງຮັບ 0.5) ──
+function calcDays(from, to, half) {
+  if (!from || !to) return null;
+  const d = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+  if (d < 1) return null;
+  return half ? 0.5 : d;
+}
+
+function calcLeaveDays() {
+  const d = calcDays(
+    document.getElementById('lFrom').value,
+    document.getElementById('lTo').value,
+    document.getElementById('lHalf').checked
+  );
+  document.getElementById('lDaysPreview').textContent = d !== null ? d : '—';
+}
+
+function calcLeaveDaysEdit() {
+  const d = calcDays(
+    document.getElementById('eLFrom').value,
+    document.getElementById('eLTo').value,
+    document.getElementById('eLHalf').checked
+  );
+  document.getElementById('eLDaysPreview').textContent = d !== null ? d : '—';
+}
 function renderLeaveBalance() {
   const el = document.getElementById('leaveBalanceArea');
   if (!el) return;
@@ -2760,7 +2814,7 @@ function renderLeaveBalance() {
   const usedByOwner = {};
   allLeaves.forEach(l => {
     if (l.status === 'approved' || getLeaveDisplayStatus(l) === 'active') {
-      const d = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+      const d = l.days_count ?? (Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1);
       usedByOwner[l.owner] = (usedByOwner[l.owner]||0) + d;
     }
   });
@@ -2801,8 +2855,8 @@ async function openBalanceModal() {
   // auto-calc remain
   ['balTotal','balUsed'].forEach(id => {
     document.getElementById(id).oninput = () => {
-      const t = parseInt(document.getElementById('balTotal').value)||0;
-      const u = parseInt(document.getElementById('balUsed').value)||0;
+      const t = parseFloat(document.getElementById('balTotal').value)||0;
+      const u = parseFloat(document.getElementById('balUsed').value)||0;
       document.getElementById('balRemain').value = Math.max(0,t-u);
     };
   });
@@ -2831,8 +2885,8 @@ async function loadBalanceForUser() {
 async function saveBalance() {
   const owner = document.getElementById('balOwner').value;
   if (!owner) { toast('⚠️ ເລືອກພະນັກງານກ່ອນ'); return; }
-  const total = parseInt(document.getElementById('balTotal').value)||0;
-  const used  = parseInt(document.getElementById('balUsed').value)||0;
+  const total = parseFloat(document.getElementById('balTotal').value)||0;
+  const used  = parseFloat(document.getElementById('balUsed').value)||0;
   const existing = allLeaveBalance.find(b => b.owner === owner);
   let error;
   if (existing) {
