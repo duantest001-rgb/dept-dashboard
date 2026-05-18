@@ -209,6 +209,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ນັດໝາຍ</button>
       <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
       <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
+      <button onclick="showPage('leave',this)"><i class="ti ti-calendar-off"></i> ລາພັກ</button>
       <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
     </nav>
   </div>
@@ -607,6 +608,108 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <button class="btn-outline" onclick="document.getElementById('editMeetForm').style.display='none'">ຍົກເລີກ</button>
       </div>
     </div>
+  </div>
+
+  <!-- ── LEAVE / ABSENCE ── -->
+  <div class="page" id="page-leave">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <span style="font-size:13px;color:var(--muted)">ລາຍການລາພັກ & ຄອບລ່ວງໜ້າ</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <select id="lFilterStatus" onchange="renderLeave()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+          <option value="">📋 ທຸກສະຖານະ</option>
+          <option value="pending">⏳ ລໍຖ້າອະນຸມັດ</option>
+          <option value="approved">✅ ອະນຸມັດແລ້ວ</option>
+          <option value="rejected">❌ ປະຕິເສດ</option>
+        </select>
+        <select id="lFilterType" onchange="renderLeave()" style="font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+          <option value="">📂 ທຸກປະເພດ</option>
+          <option value="sick">🤒 ລາປ່ວຍ</option>
+          <option value="personal">🏠 ລາສ່ວນຕົວ</option>
+          <option value="vacation">🌴 ລາພັກຮ້ອນ</option>
+          <option value="overtime">⚡ ຄອບລ່ວງໜ້າ</option>
+          <option value="other">📝 ອື່ນໆ</option>
+        </select>
+        <button class="btn-outline" onclick="toggleForm('addLeaveForm')"><i class="ti ti-plus"></i> ຂໍລາ/ຄອບ</button>
+      </div>
+    </div>
+
+    <!-- Calendar highlight strip -->
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-title"><i class="ti ti-calendar-week" style="color:var(--c5)"></i> ວັນທີຄອບ/ລາ ທີ່ກຳລັງຈະມາຮອດ (30 ວັນຂ້າງໜ້າ)</div>
+      <div id="leaveCalStrip"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+
+    <!-- Add form -->
+    <div class="card" id="addLeaveForm" style="display:none">
+      <div class="card-title"><i class="ti ti-calendar-plus"></i> ຂໍລາພັກ / ຄອບລ່ວງໜ້າ</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-row">
+          <label>ປະເພດ</label>
+          <select id="lType" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+            <option value="sick">🤒 ລາປ່ວຍ</option>
+            <option value="personal">🏠 ລາສ່ວນຕົວ</option>
+            <option value="vacation">🌴 ລາພັກຮ້ອນ</option>
+            <option value="overtime">⚡ ຄອບລ່ວງໜ້າ</option>
+            <option value="other">📝 ອື່ນໆ</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>ຊື່ພະນັກງານ</label>
+          <input type="text" id="lOwner" placeholder="ຊື່ ຫຼື Email prefix">
+        </div>
+        <div class="form-row">
+          <label>ວັນທີເລີ່ມ</label>
+          <input type="date" id="lFrom">
+        </div>
+        <div class="form-row">
+          <label>ວັນທີສິ້ນສຸດ</label>
+          <input type="date" id="lTo">
+        </div>
+      </div>
+      <div class="form-row"><label>ເຫດຜົນ / ໝາຍເຫດ</label><textarea id="lReason" placeholder="ລາຍລະອຽດ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveLeave()">💾 ສົ່ງຄຳຂໍ</button>
+        <button class="btn-outline" onclick="toggleForm('addLeaveForm')">ຍົກເລີກ</button>
+      </div>
+    </div>
+
+    <!-- Edit form -->
+    <div class="card" id="editLeaveForm" style="display:none">
+      <div class="card-title"><i class="ti ti-pencil" style="color:var(--c3)"></i> ແກ້ໄຂລາຍການ</div>
+      <input type="hidden" id="editLeaveId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-row">
+          <label>ປະເພດ</label>
+          <select id="eLType" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit">
+            <option value="sick">🤒 ລາປ່ວຍ</option>
+            <option value="personal">🏠 ລາສ່ວນຕົວ</option>
+            <option value="vacation">🌴 ລາພັກຮ້ອນ</option>
+            <option value="overtime">⚡ ຄອບລ່ວງໜ້າ</option>
+            <option value="other">📝 ອື່ນໆ</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>ຊື່ພະນັກງານ</label>
+          <input type="text" id="eLOwner" placeholder="ຊື່ ຫຼື Email prefix">
+        </div>
+        <div class="form-row">
+          <label>ວັນທີເລີ່ມ</label>
+          <input type="date" id="eLFrom">
+        </div>
+        <div class="form-row">
+          <label>ວັນທີສິ້ນສຸດ</label>
+          <input type="date" id="eLTo">
+        </div>
+      </div>
+      <div class="form-row"><label>ເຫດຜົນ</label><textarea id="eLReason" placeholder="ລາຍລະອຽດ..."></textarea></div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="saveEditLeave()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-outline" onclick="document.getElementById('editLeaveForm').style.display='none'">ຍົກເລີກ</button>
+      </div>
+    </div>
+
+    <!-- List -->
+    <div class="card"><div id="leaveList"><div class="spinner">ໂຫຼດ...</div></div></div>
   </div>
 
   <!-- ── ACTIVITY LOG ── -->
@@ -1301,7 +1404,7 @@ function togglePwd() {
 }
 
 // ── State ──
-let allTasks=[], allDocs=[], allMeets=[], currentFilter='all';
+let allTasks=[], allDocs=[], allMeets=[], allLeaves=[], currentFilter='all';
 
 // ── Page nav ──
 function showPage(p, btn) {
@@ -1309,7 +1412,7 @@ function showPage(p, btn) {
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   if(btn) btn.classList.add('active');
-  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, report:loadReport, log:loadLog, admin:loadAdmin};
+  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, leave:loadLeave, report:loadReport, log:loadLog, admin:loadAdmin};
   if(map[p]) map[p]();
 }
 
@@ -2358,6 +2461,196 @@ async function saveMeet() {
   toggleForm('addMeetForm');
   ['mTitle','mLoc','mAtt','mNote'].forEach(id=>document.getElementById(id).value='');
   loadMeet();
+}
+
+// ════ LEAVE / ABSENCE ════
+let allLeaves = [];
+
+const leaveTypeMap = {
+  sick:     { icon:'🤒', label:'ລາປ່ວຍ',       bg:'#FAECE7', color:'#993C1D' },
+  personal: { icon:'🏠', label:'ລາສ່ວນຕົວ',    bg:'#FFF3CD', color:'#856404' },
+  vacation: { icon:'🌴', label:'ລາພັກຮ້ອນ',    bg:'#E1F5EE', color:'#0F6E56' },
+  overtime: { icon:'⚡', label:'ຄອບລ່ວງໜ້າ',   bg:'#EEEDFE', color:'#534AB7' },
+  other:    { icon:'📝', label:'ອື່ນໆ',          bg:'#F1EFE8', color:'#5F5E5A' },
+};
+const leaveStatusMap = {
+  pending:  { label:'⏳ ລໍຖ້າ',       bg:'#FFF3CD', color:'#856404' },
+  approved: { label:'✅ ອະນຸມັດ',     bg:'#E1F5EE', color:'#0F6E56' },
+  rejected: { label:'❌ ປະຕິເສດ',    bg:'#FAECE7', color:'#993C1D' },
+};
+
+async function loadLeave() {
+  const { data } = await db.from('leaves').select('*').order('date_from', { ascending: true });
+  allLeaves = data || [];
+  renderLeave();
+  renderLeaveCalStrip();
+}
+
+function renderLeaveCalStrip() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const next30 = new Date(today); next30.setDate(today.getDate()+30);
+  const todayStr = today.toISOString().slice(0,10);
+  const next30Str = next30.toISOString().slice(0,10);
+
+  const upcoming = allLeaves.filter(l =>
+    l.status !== 'rejected' &&
+    l.date_to >= todayStr &&
+    l.date_from <= next30Str
+  ).sort((a,b) => a.date_from.localeCompare(b.date_from));
+
+  const el = document.getElementById('leaveCalStrip');
+  if (!upcoming.length) {
+    el.innerHTML = '<div class="empty">ບໍ່ມີລາຍການລ່ວງໜ້າ 30 ວັນ</div>';
+    return;
+  }
+
+  el.innerHTML = upcoming.map(l => {
+    const tm = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
+    const sm = leaveStatusMap[l.status]   || leaveStatusMap.pending;
+    const days = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+    const isToday = l.date_from <= todayStr && l.date_to >= todayStr;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);${isToday?'background:var(--c1l);margin:0 -1.25rem;padding:9px 1.25rem;':''}">
+      <div style="min-width:52px;text-align:center;background:${tm.bg};border-radius:var(--radius);padding:6px 4px">
+        <div style="font-size:18px">${tm.icon}</div>
+        <div style="font-size:9px;color:${tm.color};font-weight:600">${tm.label}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${l.owner||'—'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">
+          📅 ${l.date_from} ${l.date_from!==l.date_to ? '→ '+l.date_to : ''} &nbsp;·&nbsp; ${days} ວັນ
+          ${l.reason ? ' · '+l.reason : ''}
+        </div>
+      </div>
+      <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;flex-shrink:0">${sm.label}</span>
+      ${isToday ? '<span style="background:var(--c1);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;flex-shrink:0">ມື້ນີ້</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderLeave() {
+  const stQ   = document.getElementById('lFilterStatus')?.value || '';
+  const typeQ = document.getElementById('lFilterType')?.value || '';
+  let items = allLeaves;
+  if (stQ)   items = items.filter(l => l.status === stQ);
+  if (typeQ) items = items.filter(l => l.leave_type === typeQ);
+
+  const el = document.getElementById('leaveList');
+  if (!items.length) { el.innerHTML = '<div class="empty">ບໍ່ພົບລາຍການ</div>'; return; }
+
+  el.innerHTML = items.map(l => {
+    const tm = leaveTypeMap[l.leave_type] || leaveTypeMap.other;
+    const sm = leaveStatusMap[l.status]   || leaveStatusMap.pending;
+    const days = Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1;
+    const isPending = l.status === 'pending';
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">
+      <div style="min-width:48px;text-align:center;background:${tm.bg};border-radius:var(--radius);padding:6px 4px;flex-shrink:0">
+        <div style="font-size:16px">${tm.icon}</div>
+        <div style="font-size:9px;color:${tm.color};font-weight:600;margin-top:2px">${tm.label}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">
+          <strong style="font-size:14px">${l.owner||'—'}</strong>
+          <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${sm.label}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">📅 ${l.date_from}${l.date_from!==l.date_to?' → '+l.date_to:''} &nbsp;·&nbsp; ${days} ວັນ</div>
+        ${l.reason ? `<div style="font-size:12px;color:var(--text);margin-top:3px">💬 ${l.reason}</div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+          ${isPending && isSuperior() ? `
+            <button onclick="approveLeave(${l.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ອະນຸມັດ</button>
+            <button onclick="rejectLeave(${l.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">❌ ປະຕິເສດ</button>
+          ` : ''}
+          ${(isSuperior() || myEmailPrefix() === (l.owner||'')) && l.status==='pending' ? `
+            <button onclick="openEditLeave(${l.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
+          ` : ''}
+          ${isSuperior() ? `
+            <button onclick="deleteLeave(${l.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+          ` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function saveLeave() {
+  const owner = document.getElementById('lOwner').value.trim() || myEmailPrefix() || '—';
+  const lType = document.getElementById('lType').value;
+  const dFrom = document.getElementById('lFrom').value;
+  const dTo   = document.getElementById('lTo').value;
+  if (!dFrom || !dTo) { toast('⚠️ ເລືອກວັນທີເລີ່ມ ແລະ ສິ້ນສຸດ'); return; }
+  if (dTo < dFrom)    { toast('⚠️ ວັນທີສິ້ນສຸດຕ້ອງ >= ວັນທີເລີ່ມ'); return; }
+  const { error } = await db.from('leaves').insert({
+    owner, leave_type: lType,
+    date_from: dFrom, date_to: dTo,
+    reason: document.getElementById('lReason').value.trim(),
+    status: 'pending'
+  });
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('created','leave',0, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo}`);
+  toast('✅ ສົ່ງຄຳຂໍສຳເລັດ!');
+  toggleForm('addLeaveForm');
+  ['lOwner','lFrom','lTo','lReason'].forEach(id => document.getElementById(id).value='');
+  loadLeave();
+}
+
+function openEditLeave(id) {
+  const l = allLeaves.find(x=>x.id===id);
+  if (!l) return;
+  document.getElementById('editLeaveId').value = id;
+  document.getElementById('eLType').value      = l.leave_type;
+  document.getElementById('eLOwner').value     = l.owner||'';
+  document.getElementById('eLFrom').value      = l.date_from;
+  document.getElementById('eLTo').value        = l.date_to;
+  document.getElementById('eLReason').value    = l.reason||'';
+  const form = document.getElementById('editLeaveForm');
+  form.style.display = 'block';
+  form.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+async function saveEditLeave() {
+  const id    = parseInt(document.getElementById('editLeaveId').value);
+  const owner = document.getElementById('eLOwner').value.trim();
+  const lType = document.getElementById('eLType').value;
+  const dFrom = document.getElementById('eLFrom').value;
+  const dTo   = document.getElementById('eLTo').value;
+  if (!dFrom||!dTo) { toast('⚠️ ເລືອກວັນທີ'); return; }
+  const { error } = await db.from('leaves').update({
+    owner, leave_type: lType, date_from: dFrom, date_to: dTo,
+    reason: document.getElementById('eLReason').value.trim()
+  }).eq('id', id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('updated','leave', id, owner, `${leaveTypeMap[lType]?.label||lType} ${dFrom}→${dTo}`);
+  toast('✅ ແກ້ໄຂສຳເລັດ!');
+  document.getElementById('editLeaveForm').style.display='none';
+  loadLeave();
+}
+
+async function approveLeave(id) {
+  const l = allLeaves.find(x=>x.id===id);
+  const { error } = await db.from('leaves').update({ status:'approved' }).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('approved','leave', id, l?.owner||'', `${l?.date_from}→${l?.date_to}`);
+  toast('✅ ອະນຸມັດລາພັກສຳເລັດ!');
+  loadLeave();
+}
+
+async function rejectLeave(id) {
+  const l = allLeaves.find(x=>x.id===id);
+  const { error } = await db.from('leaves').update({ status:'rejected' }).eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('rejected','leave', id, l?.owner||'', `${l?.date_from}→${l?.date_to}`);
+  toast('🚫 ປະຕິເສດການລາພັກ');
+  loadLeave();
+}
+
+async function deleteLeave(id) {
+  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) return;
+  const l = allLeaves.find(x=>x.id===id);
+  const { error } = await db.from('leaves').delete().eq('id',id);
+  if (error) { toast('❌ '+error.message); return; }
+  await logAction('deleted','leave', id, l?.owner||'', '');
+  toast('🗑️ ລຶບສຳເລັດ');
+  loadLeave();
 }
 
 // ════ REPORT ════
