@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard ພະແນກພັດທະນາທຸລະກິດ</title>
+<!-- GitHub-ready single-file app. Use Supabase RLS before real deployment. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -19,7 +20,7 @@
   --c3:#BA7517;--c3l:#FAEEDA;--c3m:#854F0B;
   --c4:#D85A30;--c4l:#FAECE7;--c4m:#993C1D;
   --c5:#7F77DD;--c5l:#EEEDFE;--c5m:#534AB7;
-  --radius:10px;--radius-lg:14px;
+  --radius:10px;--radius-lg:14px;--bg2:#f1efe8;--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
 /* light mode only */
 body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
@@ -953,23 +954,59 @@ const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = supabase;
 let db;
 
+// ── SAFE HELPERS ─────────────────────────────────
+const $ = (id) => document.getElementById(id);
+function h(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+function safeAttr(value) { return h(value).replaceAll('`', '&#096;'); }
+function showLoadError(elId, error, label='ໂຫຼດຂໍ້ມູນ') {
+  const el = $(elId);
+  if (el) el.innerHTML = `<div class="empty">❌ ${h(label)} ບໍ່ສຳເລັດ: ${h(error?.message || error || 'Unknown error')}</div>`;
+}
+function requireDbReady() {
+  if (!db) {
+    $('config-warn').style.display = 'block';
+    return false;
+  }
+  return true;
+}
+
+
 // ── ROLE helpers ─────────────────────────────────
 let currentUser = null;
 let currentRole = 'employee';
 
 async function loadUserProfile() {
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) return;
-  currentUser = user;
-  const { data } = await db.from('profiles').select('*').eq('id', user.id).single();
-  if (data) {
-    currentRole = data.role;
-    const roleName = {admin:'Admin',manager:'ຫົວໜ້າ',employee:'ພະນັກງານ',viewer:'Viewer'}[data.role]||data.role;
-    document.getElementById('userEmail').textContent = `${user.email} (${roleName})`;
-    if (data.role === 'admin') {
-      const btn = document.getElementById('adminNavBtn');
-      if (btn) btn.style.display = 'inline-block';
-    }
+  try {
+    currentRole = 'employee';
+    currentUser = null;
+    const adminBtn = $('adminNavBtn');
+    if (adminBtn) adminBtn.style.display = 'none';
+
+    const { data: { user }, error: userError } = await db.auth.getUser();
+    if (userError) throw userError;
+    if (!user) return null;
+    currentUser = user;
+
+    const { data, error } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    if (error) throw error;
+
+    if (data?.role) currentRole = data.role;
+    const roleName = {admin:'Admin',manager:'ຫົວໜ້າ',employee:'ພະນັກງານ',viewer:'Viewer'}[currentRole] || currentRole;
+    const userEmailEl = $('userEmail');
+    if (userEmailEl) userEmailEl.textContent = `${user.email} (${roleName})`;
+    if (currentRole === 'admin' && adminBtn) adminBtn.style.display = 'inline-block';
+    return data;
+  } catch (err) {
+    console.error('loadUserProfile failed:', err);
+    toast('⚠️ ໂຫຼດ Profile ບໍ່ສຳເລັດ');
+    return null;
   }
 }
 
@@ -1037,11 +1074,11 @@ async function loadLog() {
           <div class="log-icon" style="background:${colors[l.action]||'#F1EFE8'}">${icons[l.action]||'•'}</div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;color:var(--text)">
-              <strong style="cursor:pointer;color:var(--c2m)" onclick="filterLogByUser('${who}')" title="ກອງຕາມ ${name}">${name}</strong>
+              <strong style="cursor:pointer;color:var(--c2m)" onclick="filterLogByUser('${h(who)}')" title="ກອງຕາມ ${h(name)}">${h(name)}</strong>
               <span style="color:var(--muted)"> ${l.action} </span>
-              <strong>${l.target_name||''}</strong>
+              <strong>${h(l.target_name||'')}</strong>
             </div>
-            ${l.detail?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${l.detail}</div>`:''}
+            ${l.detail?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${h(l.detail)}</div>`:''}
             <div style="font-size:11px;color:var(--muted);margin-top:2px">${dt} · ${l.target_type}</div>
           </div>
         </div>`;
@@ -1093,8 +1130,8 @@ async function loadAllCommentPreviews() {
       const canFixed = !c.fixed_by && canAckComment(c);
       return `<div style="background:${bg};border-radius:6px;padding:5px 8px;margin-bottom:4px;font-size:12px;color:${col}">
         <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
-          <span style="font-weight:500">${icon} ${who}:</span>
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.body}</span>
+          <span style="font-weight:500">${icon} ${h(who)}:</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(c.body)}</span>
           ${ackd}${fixed}
         </div>
         ${(canAck || canFixed) ? `<div style="display:flex;gap:4px;margin-top:4px">
@@ -1182,7 +1219,7 @@ async function loadComments(taskId) {
             ${c.ack_by?`<span style="font-size:10px;background:#E1F5EE;color:#0F6E56;padding:1px 6px;border-radius:8px">✓ ຮັບຮູ້ໂດຍ ${c.ack_by.split('@')[0]}</span>`:''}
             ${c.fixed_by?`<span style="font-size:10px;background:#E6F1FB;color:#185FA5;padding:1px 6px;border-radius:8px">🔧 ແກ້ໄປໂດຍ ${c.fixed_by.split('@')[0]}</span>`:''}
           </div>
-          <div class="comment-body" style="margin-top:4px">${c.body}</div>
+          <div class="comment-body" style="margin-top:4px">${h(c.body)}</div>
           ${c.progress_snapshot!=null?`<div style="font-size:11px;color:var(--muted);margin-top:3px;padding-left:32px">Progress: ${c.progress_snapshot}% | Status: ${{inprogress:'ດຳເນີນ',blocked:'ຕິດຂັດ',done:'ສຳເລັດ'}[c.status_snapshot]||c.status_snapshot||'—'}</div>`:''}
           ${(canAck||canFixed)?`<div style="display:flex;gap:6px;margin-top:6px;padding-left:0">
             ${canAck?`<button onclick="ackComment(${c.id},${taskId},'ack')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid #1D9E75;background:#E1F5EE;color:#0F6E56;cursor:pointer;font-family:inherit">✓ ຮັບຮູ້</button>`:''}
@@ -1322,14 +1359,14 @@ function renderAdminUsers() {
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-              ${u.email||'—'} ${isSelf ? '<span style="font-size:10px;color:var(--muted)">(ຕົວທ່ານ)</span>' : ''}
+              ${h(u.email||'—')} ${isSelf ? '<span style="font-size:10px;color:var(--muted)">(ຕົວທ່ານ)</span>' : ''}
             </div>
             <div style="font-size:11px;color:var(--muted);margin-top:2px">
               ເຂົ້າໃຊ້ຄັ້ງທຳອິດ: ${u.created_at ? new Date(u.created_at).toLocaleDateString('lo-LA') : '—'}
             </div>
           </div>
-          <span style="background:${rb.bg};color:${rb.color};padding:3px 10px;border-radius:10px;font-size:11px;font-weight:500;flex-shrink:0">${rb.label}</span>
-          ${!isSelf ? `<button onclick="openEditRole('${u.id}','${u.email}','${u.role}')" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;color:var(--c2m);flex-shrink:0"><i class="ti ti-pencil"></i> Role</button>` : ''}
+          <span style="background:${rb.bg};color:${rb.color};padding:3px 10px;border-radius:10px;font-size:11px;font-weight:500;flex-shrink:0">${h(rb.label)}</span>
+          ${!isSelf ? `<button onclick="openEditRole('${safeAttr(u.id)}','${safeAttr(u.email)}','${safeAttr(u.role)}')" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;color:var(--c2m);flex-shrink:0"><i class="ti ti-pencil"></i> Role</button>` : ''}
         </div>`;
       }).join('');
 }
@@ -1396,8 +1433,13 @@ document.addEventListener('click', e => {
 });
 
 function initApp() {
-  if (SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON')) {
-    document.getElementById('config-warn').style.display = 'block';
+  const badConfig = !SUPABASE_URL || !SUPABASE_KEY ||
+    SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON') ||
+    !SUPABASE_URL.startsWith('https://') || SUPABASE_KEY.length < 20;
+  if (badConfig) {
+    $('config-warn').style.display = 'block';
+    $('loginPage').style.display = 'none';
+    $('mainApp').style.display = 'none';
     return;
   }
   db = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1405,25 +1447,33 @@ function initApp() {
 }
 
 async function checkSession() {
-  const { data: { session } } = await db.auth.getSession();
-  if (session) {
-    showApp(session.user.email);
-  } else {
-    document.getElementById('loginPage').style.display = 'block';
+  if (!requireDbReady()) return;
+  try {
+    const { data: { session }, error } = await db.auth.getSession();
+    if (error) throw error;
+    if (session) {
+      await showApp(session.user.email);
+    } else {
+      $('loginPage').style.display = 'block';
+    }
+    db.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) await showApp(session.user.email);
+      if (event === 'SIGNED_OUT') showLogin();
+    });
+  } catch (err) {
+    console.error('checkSession failed:', err);
+    showErr('❌ ເຊື່ອມຕໍ່ Supabase ບໍ່ສຳເລັດ: ' + (err.message || err));
+    $('loginPage').style.display = 'block';
   }
-  db.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN') showApp(session.user.email);
-    if (event === 'SIGNED_OUT') showLogin();
-  });
 }
 
-function showApp(email) {
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('mainApp').style.display = 'block';
-  document.getElementById('userEmail').textContent = email;
-  loadUserProfile();
-  document.getElementById('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  loadDash();
+async function showApp(email) {
+  $('loginPage').style.display = 'none';
+  $('mainApp').style.display = 'block';
+  $('userEmail').textContent = email;
+  await loadUserProfile();
+  $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  await Promise.allSettled([loadUserOptions(), loadDash()]);
 }
 
 function showLogin() {
@@ -1434,16 +1484,22 @@ function showLogin() {
 }
 
 async function doLogin() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  const btn = document.getElementById('loginBtn');
-  const errEl = document.getElementById('loginError');
+  if (!requireDbReady()) return;
+  const email = $('loginEmail').value.trim();
+  const password = $('loginPassword').value;
+  const btn = $('loginBtn');
+  const errEl = $('loginError');
   if (!email || !password) { showErr('ກະລຸນາໃສ່ Email ແລະ Password'); return; }
   btn.disabled = true; btn.textContent = 'ກຳລັງ Login...';
   errEl.style.display = 'none';
-  const { error } = await db.auth.signInWithPassword({ email, password });
-  btn.disabled = false; btn.textContent = 'Login';
-  if (error) showErr(error.message === 'Invalid login credentials' ? '❌ Email ຫຼື Password ບໍ່ຖືກ' : '❌ ' + error.message);
+  try {
+    const { error } = await db.auth.signInWithPassword({ email, password });
+    if (error) showErr(error.message === 'Invalid login credentials' ? '❌ Email ຫຼື Password ບໍ່ຖືກ' : '❌ ' + error.message);
+  } catch (err) {
+    showErr('❌ ລະບົບ Login ມີບັນຫາ: ' + (err.message || err));
+  } finally {
+    btn.disabled = false; btn.textContent = 'Login';
+  }
 }
 
 function showErr(msg) {
@@ -1607,7 +1663,7 @@ async function loadDash() {
         ${pendMeets.map(m => `
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #FAC775">
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:500;color:var(--text)">${m.title}</div>
+              <div style="font-size:13px;font-weight:500;color:var(--text)">${h(m.title)}</div>
               <div style="font-size:11px;color:#854F0B;margin-top:2px">
                 <i class="ti ti-calendar" style="font-size:11px"></i> ${m.meet_date} ${m.meet_time||''} · ${m.location||'—'}
               </div>
@@ -1629,15 +1685,15 @@ async function loadDash() {
   document.getElementById('urgentPreview').innerHTML = urgent.length===0
     ? '<div class="empty">✅ ບໍ່ມີວຽກດ່ວນ</div>'
     : urgent.map(t=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c3)'};margin-right:6px"></span>${t.name}
-        <br><span style="font-size:11px;color:var(--muted);margin-left:14px">${t.owner} · ${t.due_date}</span>
+        <span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c3)'};margin-right:6px"></span>${h(t.name)}
+        <br><span style="font-size:11px;color:var(--muted);margin-left:14px">${h(t.owner)} · ${t.due_date}</span>
       </div>`).join('');
 
   const pendDocs = allDocs.filter(d=>d.current_step<(d.steps||[]).length-1);
   document.getElementById('docPreview').innerHTML = pendDocs.length===0
     ? '<div class="empty">✅ ບໍ່ມີເອກະສານຄ້າງ</div>'
     : pendDocs.map(d=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
-        ${d.doc_type} ${d.name}
+        ${d.doc_type} ${h(d.name)}
         <br><span style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${(d.steps||[])[d.current_step]||'—'}</span>
       </div>`).join('');
 
@@ -1655,8 +1711,8 @@ async function loadDash() {
   document.getElementById('meetPreview').innerHTML = next2.length===0
     ? '<div class="empty">ບໍ່ມີກອງປະຊຸມທີ່ກຳນົດໄວ້</div>'
     : next2.map(m=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
-        <i class="ti ti-calendar-event" style="color:var(--c2);font-size:13px"></i> <strong>${m.title}</strong>
-        <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date||'ບໍ່ກຳນົດ'} ${m.meet_time||''} · ${m.location}</span>
+        <i class="ti ti-calendar-event" style="color:var(--c2);font-size:13px"></i> <strong>${h(m.title)}</strong>
+        <br><span style="font-size:11px;color:var(--muted);margin-left:18px">${m.meet_date||'ບໍ່ກຳນົດ'} ${m.meet_time||''} · ${h(m.location)}</span>
       </div>`).join('');
 
   const anns = annRes.data||[];
@@ -1723,16 +1779,16 @@ function renderTasks() {
       <div class="task-item" id="ti-${t.id}" style="${rowBg}">
         <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleDone(${t.id},'${t.status}')">${t.status==='done'?'✓':''}</div>
         <div class="task-info">
-          <div class="task-name ${t.status==='done'?'done':''}">${t.name}</div>
+          <div class="task-name ${t.status==='done'?'done':''}">${h(t.name)}</div>
           <div class="task-meta">
-            <span><i class="ti ti-user" style="font-size:11px"></i> ${t.owner}</span>
+            <span><i class="ti ti-user" style="font-size:11px"></i> ${h(t.owner)}</span>
             <span style="${due.cls}"><i class="ti ti-calendar" style="font-size:11px"></i> ${due.label}</span>
             ${due.tag}
             <span class="badge ${t.priority}">${t.priority==='urgent'?'🔴 ດ່ວນ':'🔵 ປົກກະຕິ'}</span>
             <span class="badge ${t.status==='done'?'done-b':t.status==='blocked'?'blocked':'inprogress'}">${{done:'ສຳເລັດ',inprogress:'ດຳເນີນຢູ່',blocked:'ຕິດຂັດ'}[t.status]||t.status}</span>
           </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${t.progress}%;background:${t.status==='blocked'?'var(--c4)':t.status==='done'?'var(--c1)':'var(--c2)'}"></div></div>
-          ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">📝 ${t.notes}</div>`:''}
+          ${t.notes?`<div style="font-size:11px;color:var(--muted);margin-top:5px;font-style:italic">📝 ${h(t.notes)}</div>`:''}
           <div id="comment-preview-${t.id}" style="margin-top:4px"></div>
         </div>
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
@@ -1860,8 +1916,8 @@ function renderBlockers() {
   document.getElementById('blockerList').innerHTML = blk.length===0
     ? '<div class="empty">✅ ບໍ່ມີວຽກຕິດຂັດ</div>'
     : blk.map(t=>`<div class="blocker-item">
-        <div class="blocker-title">⛔ ${t.name}</div>
-        <div class="blocker-meta">ຮັບຜິດຊອບ: ${t.owner} · ກຳນົດ: ${t.due_date}${t.notes?' · '+t.notes:''}</div>
+        <div class="blocker-title">⛔ ${h(t.name)}</div>
+        <div class="blocker-meta">ຮັບຜິດຊອບ: ${h(t.owner)} · ກຳນົດ: ${t.due_date}${t.notes?' · '+t.notes:''}</div>
       </div>`).join('');
 }
 
@@ -1980,7 +2036,7 @@ function renderDocs() {
             })() : `<span style="font-size:10px;color:var(--muted);font-style:italic">
               ${{in:'📥 ຂາເຂົ້າ', out:'📤 ຂາອອກ', internal:'📋 ພາຍໃນ'}[d.doc_direction||'in']||'📄'}
             </span>`}
-            ${d.name} ${statusBadge[docStatus]||statusBadge.inprogress}
+            ${h(d.name)} ${statusBadge[docStatus]||statusBadge.inprogress}
           </div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
           <div class="flow-steps">${stepsHtml}</div>
@@ -2318,7 +2374,7 @@ function renderMeet() {
             <span style="background:${tm.bg};color:${tm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${tm.icon} ${tp}</span>
             <span style="background:${sm.bg};color:${sm.color};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500">${sm.label}</span>
           </div>
-          <div class="meet-title" style="${isDone?'text-decoration:line-through;color:var(--muted)':''}">${m.title}</div>
+          <div class="meet-title" style="${isDone?'text-decoration:line-through;color:var(--muted)':''}">${h(m.title)}</div>
           <div class="meet-detail"><i class="ti ti-map-pin" style="font-size:11px"></i> ${m.location||'—'}${m.notes?' · '+m.notes:''}</div>
           <div class="attendees">${avatars}</div>
           <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
@@ -2772,15 +2828,6 @@ async function deleteLeave(id) {
   loadLeave();
 }
 
-async function deleteLeave(id) {
-  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) return;
-  const l = allLeaves.find(x=>x.id===id);
-  const { error } = await db.from('leaves').delete().eq('id',id);
-  if (error) { toast('❌ '+error.message); return; }
-  await logAction('deleted','leave', id, l?.owner||'', '');
-  toast('🗑️ ລຶບສຳເລັດ');
-  loadLeave();
-}
 
 // ── ຄຳນວນຈຳນວນວັນລາ (ຮອງຮັບ 0.5) ──
 function calcDays(from, to, half) {
@@ -2967,8 +3014,8 @@ async function loadReport() {
         const days = Math.ceil((today - new Date(x.due_date)) / (1000*60*60*24));
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.name}</div>
-            <div style="font-size:11px;color:var(--muted)">${x.owner} · Due: ${x.due_date}</div>
+            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${h(x.owner)} · Due: ${x.due_date}</div>
           </div>
           <span style="background:var(--c4l);color:var(--c4m);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">ຊ້າ ${days} ວັນ</span>
         </div>`;
@@ -2982,7 +3029,7 @@ async function loadReport() {
         return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
           <span style="font-size:18px">${x.doc_type}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.name}</div>
+            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
             <div style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${step}</div>
           </div>
         </div>`;
@@ -2997,7 +3044,7 @@ async function loadReport() {
         const medal = i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : '';
         return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
           <div style="min-width:28px;font-size:14px;text-align:center">${medal||`${i+1}.`}</div>
-          <div style="min-width:90px;font-size:13px;color:var(--text);font-weight:${i===0?'600':'400'}">${name}</div>
+          <div style="min-width:90px;font-size:13px;color:var(--text);font-weight:${i===0?'600':'400'}">${h(name)}</div>
           <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
             <div style="height:100%;width:${pct2}%;background:${i===0?'var(--c4)':'var(--c2)'};border-radius:4px;transition:width .4s"></div>
           </div>
@@ -3031,8 +3078,8 @@ async function loadReport() {
   // ── Progress timeline ─────────────────────────────
   document.getElementById('reportProgress').innerHTML = t.map(x=>`
     <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="width:130px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.name}</div>
-      <div style="width:70px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.owner}</div>
+      <div style="width:130px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
+      <div style="width:70px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.owner)}</div>
       <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
         <div style="height:100%;width:${x.progress}%;background:${x.status==='blocked'?'var(--c4)':x.status==='done'?'var(--c1)':'var(--c2)'};border-radius:4px"></div>
       </div>
