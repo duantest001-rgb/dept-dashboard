@@ -2053,6 +2053,21 @@ function renderProfileMiniList(items, emptyText, renderer) {
   return `<div class="profile-list">${items.map(renderer).join('')}</div>`;
 }
 
+function calcLeaveRemaining(balance) {
+  if (!balance) return null;
+  const total = Number(balance.total_days ?? 0);
+  const used = Number(balance.used_days ?? 0);
+  if (Number.isNaN(total) || Number.isNaN(used)) return null;
+  return Math.max(0, total - used);
+}
+
+function formatLeaveDays(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  const n = Number(value);
+  if (Number.isNaN(n)) return '-';
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 async function loadProfileDashboard() {
   try {
     if (!currentProfile) await loadUserProfile();
@@ -2088,6 +2103,7 @@ async function loadProfileDashboard() {
       return attendees.includes(email) || matchesMe(m.created_by);
     });
     const balance = balRes.data || null;
+    const remainingLeave = calcLeaveRemaining(balance);
     const myLogs = logRes.data || [];
 
     const openTasks = myTasks.filter(t => t.status !== 'done').length;
@@ -2099,7 +2115,7 @@ async function loadProfileDashboard() {
       <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c2l);color:var(--c2m)"><i class="ti ti-checkbox"></i></div><div><div class="profile-stat-num">${myTasks.length}</div><div class="profile-stat-label">ວຽກຂອງຂ້ອຍ · ${openTasks} open</div></div></div>
       <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c3l);color:var(--c3m)"><i class="ti ti-file-text"></i></div><div><div class="profile-stat-num">${myDocs.length}</div><div class="profile-stat-label">ເອກະສານ · ${pendingDocs} pending</div></div></div>
       <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c5l);color:var(--c5m)"><i class="ti ti-calendar-event"></i></div><div><div class="profile-stat-num">${myMeets.length}</div><div class="profile-stat-label">ນັດໝາຍ · ${upcomingMeets} upcoming</div></div></div>
-      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c1l);color:var(--c1m)"><i class="ti ti-calendar-off"></i></div><div><div class="profile-stat-num">${balance?.remaining ?? '-'}</div><div class="profile-stat-label">ວັນລາຄົງເຫຼືອ</div></div></div>
+      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c1l);color:var(--c1m)"><i class="ti ti-calendar-off"></i></div><div><div class="profile-stat-num">${formatLeaveDays(remainingLeave)}</div><div class="profile-stat-label">ວັນລາຄົງເຫຼືອ</div></div></div>
     `;
 
     $('profileTasks').innerHTML = renderProfileMiniList(
@@ -2122,7 +2138,7 @@ async function loadProfileDashboard() {
 
     $('profileLeave').innerHTML = `
       <div style="display:grid;gap:8px">
-        <div class="profile-mini-item"><div><div class="profile-item-title">ວັນລາຄົງເຫຼືອ</div><div class="profile-item-meta">Balance</div></div><strong>${h(balance?.remaining ?? '-')}</strong></div>
+        <div class="profile-mini-item"><div><div class="profile-item-title">ວັນລາຄົງເຫຼືອ</div><div class="profile-item-meta">${balance ? `ໃຊ້ໄປ ${formatLeaveDays(balance.used_days)} / ${formatLeaveDays(balance.total_days)} ວັນ` : 'Balance'}</div></div><strong>${formatLeaveDays(remainingLeave)} ວັນ</strong></div>
         ${renderProfileMiniList(myLeaves.slice(0,4), 'ຍັງບໍ່ມີລາຍການຂໍລາ', l => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(l.type || '-')}</div><div class="profile-item-meta">${h(l.date_from || '')} → ${h(l.date_to || '')}</div></div><span class="badge ${l.status === 'approved' ? 'done-b' : l.status === 'rejected' ? 'urgent' : 'inprogress'}">${h(l.status || 'pending')}</span></div>`)}
       </div>`;
 
