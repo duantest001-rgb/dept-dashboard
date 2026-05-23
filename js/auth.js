@@ -82,6 +82,7 @@ async function showApp(email) {
 
   $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   await Promise.allSettled([loadUserOptions(true), loadDash()]);
+  if (typeof refreshNotifications === 'function') refreshNotifications({ silent: true });
 }
 
 function showLogin() {

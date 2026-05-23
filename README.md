@@ -37,3 +37,12 @@ js/
 ## Next recommended split
 
 If the app grows further, split `core.js` into `permissions.js`, `helpers.js`, and `state.js`.
+
+
+## v22 Notification System
+- Toast notification แบบ production
+- Notification bell + unread badge
+- Overdue task alerts
+- Meeting reminders today/tomorrow
+- Pending document reminders
+- Read state saved in localStorage per user

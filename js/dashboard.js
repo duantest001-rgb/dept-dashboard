@@ -123,6 +123,9 @@ async function loadDash() {
       </div>
       ${canManageAnn()?`<button class="btn-delete" data-manager-only onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
     </div>`).join('');
+
+  if (typeof refreshNotifications === 'function') refreshNotifications({ silent: true });
+
 }
 
 // ════ TASKS ════
