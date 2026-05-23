@@ -1,32 +1,39 @@
-# Department Dashboard Refactor v20
+# Department Dashboard Refactor v21
 
-ແຍກໄຟລ໌ຈາກ `index_layout_proportion_fix_v19.html` ໃຫ້ເປັນສ່ວນໆ.
+This version separates the previous single `js/app.js` file into feature modules.
 
 ## Structure
 
-```
+```text
 index.html
 css/
   style.css
 js/
-  app.js
+  config.js
+  core.js
+  activity.js
+  comments.js
+  ui.js
+  participants.js
+  admin.js
+  auth.js
+  profile.js
+  dashboard.js
+  tasks.js
+  documents.js
+  meetings.js
+  leave.js
+  reports.js
+  main.js
 ```
 
-## ວິທີໃຊ້
+## Important
 
-1. Upload ທັງ folder/file ເຂົ້າ GitHub repo ຂອງເຈົ້າ.
-2. ໃຫ້ `index.html` ຢູ່ root.
-3. ໃຫ້ folder `css` ແລະ `js` ຢູ່ root ຄຽງກັບ `index.html`.
+- Keep all files/folders at the repository root.
+- `index.html` loads modules in order using normal script tags.
+- `main.js` runs `initApp()` last.
+- Supabase config remains in `js/config.js`.
 
-## ຕໍ່ໄປແນະນຳ
+## Next recommended split
 
-ຮອບຕໍ່ໄປຄ່ອຍແຍກ `js/app.js` ອອກເປັນ modules:
-- auth.js
-- api.js
-- dashboard.js
-- tasks.js
-- documents.js
-- meetings.js
-- profile.js
-- activity.js
-```
+If the app grows further, split `core.js` into `permissions.js`, `helpers.js`, and `state.js`.
