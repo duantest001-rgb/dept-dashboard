@@ -186,6 +186,114 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 .participant-chip .p-check{font-size:14px;color:var(--c1);width:16px;text-align:center}
 .participant-summary{font-size:11px;color:var(--muted);margin-top:6px}
 
+
+
+/* =========================================================
+   Modern Enterprise UI v16 - Business Development Dashboard
+   Visual-only refactor: sidebar, premium cards, cleaner layout
+   ========================================================= */
+:root{
+  --app-bg:#f5f7fb;
+  --surface:#ffffff;
+  --surface-soft:#f8fafc;
+  --line:#e7e9ef;
+  --ink:#172033;
+  --ink-soft:#667085;
+  --brand:#9f1239;
+  --brand-2:#be123c;
+  --brand-3:#e11d48;
+  --brand-soft:#fff1f2;
+  --shadow-sm:0 6px 18px rgba(15,23,42,.06);
+  --shadow-md:0 14px 34px rgba(15,23,42,.10);
+  --radius-xl:22px;
+}
+html{scroll-behavior:smooth}
+body{background:linear-gradient(135deg,#f8fafc 0%,#f4f6fb 48%,#fff7f7 100%);color:var(--ink)}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle at 18% 8%,rgba(225,29,72,.10),transparent 28%),radial-gradient(circle at 92% 6%,rgba(30,64,175,.07),transparent 25%);z-index:-1}
+
+/* Login keeps centered while app gets enterprise shell */
+#loginPage.app{max-width:960px;padding:1.25rem 1rem 3rem}
+#mainApp.app{max-width:none;margin:0;padding:24px 28px 54px 304px;min-height:100vh}
+#mainApp .sticky-header{position:fixed;left:18px;top:18px;bottom:18px;width:264px;max-width:none;margin:0;padding:16px;background:linear-gradient(180deg,#7f1d1d 0%,#9f1239 48%,#111827 100%);border-radius:28px;box-shadow:var(--shadow-md);color:#fff;overflow:auto;z-index:200}
+#mainApp .topbar{display:flex;flex-direction:column;align-items:stretch;gap:14px;padding:0 0 16px;border-bottom:1px solid rgba(255,255,255,.16)}
+#mainApp .topbar h1{font-size:15px;line-height:1.35;color:#fff;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.13);border-radius:20px;padding:14px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+#mainApp .topbar h1 i{color:#fecdd3!important;font-size:22px}
+#mainApp .topbar>div{display:flex!important;flex-direction:column;align-items:stretch!important;gap:8px!important;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:12px}
+#mainApp .topbar .date{color:#fecdd3;font-size:12px}
+#mainApp #userEmail{display:block!important;background:rgba(255,255,255,.16)!important;color:#fff!important;border-radius:14px!important;padding:8px 10px!important;text-align:center!important;word-break:break-word}
+#mainApp .topbar button{background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.14)!important;color:#fff!important;border-radius:14px!important;padding:9px 12px!important;text-align:center;transition:.2s}
+#mainApp .topbar button:hover{background:rgba(255,255,255,.20)!important;transform:translateY(-1px)}
+
+#mainApp .nav{display:flex;flex-direction:column;gap:8px;padding:16px 0 0;border-bottom:0;margin:0}
+#mainApp .nav button{width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start;padding:11px 13px;border-radius:16px;border:1px solid transparent;background:transparent;color:rgba(255,255,255,.78);font-size:13px;letter-spacing:.1px;transition:.18s}
+#mainApp .nav button i{font-size:18px;color:#fecdd3}
+#mainApp .nav button:hover:not(.active){background:rgba(255,255,255,.10);color:#fff;transform:translateX(2px)}
+#mainApp .nav button.active{background:#fff;color:#8a102d;border-color:#fff;box-shadow:0 10px 22px rgba(0,0,0,.16)}
+#mainApp .nav button.active i{color:#be123c}
+#mainApp>div[style*="padding-top"]{padding-top:0!important;max-width:1360px;margin:0 auto}
+
+/* Page title feel */
+#mainApp .page.active{animation:fadeUp .22s ease-out}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Premium cards */
+#mainApp .card,#mainApp .search-panel,#mainApp .metric{background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border:1px solid rgba(226,232,240,.9);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm)}
+#mainApp .card{padding:1.15rem 1.25rem;margin-bottom:1.05rem}
+#mainApp .card:hover,#mainApp .metric:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+#mainApp .card,#mainApp .metric{transition:box-shadow .18s,transform .18s,border-color .18s}
+#mainApp .card-title{font-size:14px;font-weight:800;color:#1f2937;margin-bottom:14px}
+#mainApp .card-title i{font-size:18px}
+
+#mainApp .metrics{grid-template-columns:repeat(4,minmax(160px,1fr));gap:14px;margin-bottom:1.2rem}
+#mainApp .metric{position:relative;overflow:hidden;text-align:left;padding:1.15rem;border:0;background:linear-gradient(135deg,#fff 0%,#fff 52%,#fff1f2 100%)}
+#mainApp .metric::after{content:'';position:absolute;right:-26px;top:-26px;width:86px;height:86px;background:rgba(225,29,72,.10);border-radius:50%}
+#mainApp .metric .num{font-size:32px;line-height:1;font-weight:850;color:#111827;letter-spacing:-.7px}
+#mainApp .metric .lbl{font-size:12px;color:#667085;margin-top:8px;font-weight:700}
+
+/* Rows, list items */
+#mainApp .task-item,#mainApp .doc-item,#mainApp .meeting-item,#mainApp .comment-item,#mainApp .log-item{border-bottom:1px solid #edf0f5;padding:13px 0}
+#mainApp .task-item:hover,#mainApp .doc-item:hover,#mainApp .meeting-item:hover{background:#fbfcff;border-radius:16px;padding-left:10px;padding-right:10px}
+#mainApp .task-name,#mainApp .doc-name,#mainApp .meet-title{font-weight:750;color:#111827}
+#mainApp .task-meta,#mainApp .doc-sub,#mainApp .meet-detail{color:#667085}
+#mainApp .doc-icon,#mainApp .meet-date{box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
+
+/* Buttons */
+#mainApp .btn-primary{background:linear-gradient(135deg,#be123c,#e11d48);box-shadow:0 10px 22px rgba(225,29,72,.20);border-radius:14px;padding:10px 18px;color:#fff}
+#mainApp .btn-primary:hover{transform:translateY(-1px);box-shadow:0 14px 26px rgba(225,29,72,.26)}
+#mainApp .btn-outline{background:#fff;border:1px solid #e5e7eb;border-radius:14px;color:#374151;padding:9px 14px;box-shadow:0 4px 12px rgba(15,23,42,.04)}
+#mainApp .btn-outline:hover{border-color:#fecdd3;background:#fff1f2;color:#9f1239}
+#mainApp button{transition:.18s}
+
+/* Inputs */
+#mainApp .form-row input,#mainApp .form-row select,#mainApp .form-row textarea,#mainApp input,#mainApp select,#mainApp textarea{border-color:#e5e7eb;border-radius:14px;background:#fff;transition:border-color .16s,box-shadow .16s}
+#mainApp .form-row input:focus,#mainApp .form-row select:focus,#mainApp .form-row textarea:focus,#mainApp input:focus,#mainApp select:focus,#mainApp textarea:focus{outline:none;border-color:#fb7185;box-shadow:0 0 0 4px rgba(251,113,133,.16)}
+
+/* Badges */
+#mainApp .badge{border-radius:999px;padding:4px 10px;font-weight:800}
+#mainApp .role-badge{border-radius:999px;padding:4px 10px;font-weight:800}
+
+/* Profile dashboard polish */
+#mainApp .profile-hero,#mainApp .profile-card,#mainApp .profile-panel{border-radius:26px!important;box-shadow:var(--shadow-sm)!important}
+#mainApp .activity-item{position:relative;border-left:3px solid #fecdd3;padding-left:14px;margin-left:4px}
+#mainApp .activity-item::before{content:'';position:absolute;left:-7px;top:14px;width:11px;height:11px;background:#e11d48;border-radius:50%;box-shadow:0 0 0 4px #fff1f2}
+
+/* Mobile responsive */
+@media(max-width:920px){
+  #mainApp.app{padding:12px 12px 42px}
+  #mainApp .sticky-header{position:sticky;top:0;left:auto;bottom:auto;width:auto;border-radius:0 0 24px 24px;margin:-12px -12px 14px;padding:12px;max-height:78vh}
+  #mainApp .topbar{gap:10px}
+  #mainApp .topbar h1{font-size:14px}
+  #mainApp .nav{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  #mainApp .nav button{justify-content:center;padding:10px 8px}
+  #mainApp .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #mainApp .row2{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  #mainApp .nav{grid-template-columns:1fr}
+  #mainApp .metrics{grid-template-columns:1fr}
+  #mainApp .card{padding:1rem}
+}
+
 </style>
 </head>
 <body>
