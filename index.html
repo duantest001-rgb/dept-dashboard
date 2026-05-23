@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard ພະແນກພັດທະນາທຸລະກິດ</title>
+<!-- Patch v2: Query/RLS Sync - store owner/created_by as email and let RLS filter reads -->
 <!-- GitHub-ready single-file app. Use Supabase RLS before real deployment. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1016,6 +1017,29 @@ function myEmailKey() {
   return myEmail().split('@')[0] || '';
 }
 
+// Query/RLS Sync helper: owner/created_by must be stored as full email.
+// This keeps new data aligned with Supabase RLS policies.
+function normalizeUserRef(value, fallbackEmail = myEmail()) {
+  const v = String(value || '').trim().toLowerCase();
+  const fallback = String(fallbackEmail || '').trim().toLowerCase();
+  if (!v || v === '—') return fallback || '—';
+
+  // Dropdown values from profiles are already emails.
+  if (v.includes('@')) return v;
+
+  // If old code gives only prefix of current user, map it to current email.
+  if (fallback && v === fallback.split('@')[0]) return fallback;
+
+  // Try to map prefix/full label against loaded users.
+  const found = (cachedUserOptions || []).find(u => {
+    const email = String(u.email || u.value || '').trim().toLowerCase();
+    const key = email.split('@')[0];
+    const label = String(u.label || '').trim().toLowerCase();
+    return v === email || v === key || label.includes(v);
+  });
+  return found?.email || found?.value || v;
+}
+
 function matchesMe(value) {
   const v = String(value || '').trim().toLowerCase();
   return !!v && (v === myEmail() || v === myEmailKey());
@@ -1667,7 +1691,7 @@ function toggleForm(id) {
   el.style.display = el.style.display==='none' ? 'block' : 'none';
   if (el.style.display !== 'block') return;
   el.scrollIntoView({behavior:'smooth', block:'nearest'});
-  const me = myEmailPrefix();
+  const me = myEmail();
   if (id === 'addTaskForm') populateUserSelect('tOwner', me, !isSuperior());
   if (id === 'addDocForm')  {
     populateUserSelect('dFrom', me, !isSuperior());
@@ -1979,7 +2003,7 @@ async function saveEditTask() {
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກ');return;}
   const {error} = await db.from('tasks').update({
     name:n,
-    owner:document.getElementById('eOwner').value||'—',
+    owner: normalizeUserRef(document.getElementById('eOwner').value, myEmail()),
     due_date:document.getElementById('eDue').value||null,
     priority:document.getElementById('ePri').value,
     status:document.getElementById('eStatus').value,
@@ -2036,9 +2060,9 @@ async function saveTask() {
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກດ້ວຍ');return;}
   const btn = document.getElementById('saveTaskBtn');
   btn.disabled=true; btn.textContent='ກຳລັງບັນທຶກ...';
-  // Normalize owner — employee ຈະ save email prefix ຂອງຕົນ, superior ພິມຊື່ໃດກໍ່ໄດ້
+  // Normalize owner — always save full email so frontend stays synced with RLS
   const ownerRaw = document.getElementById('tOwner').value.trim();
-  const owner = ownerRaw || myEmailPrefix() || '—';
+  const owner = normalizeUserRef(ownerRaw, myEmail());
   const {data, error} = await db.from('tasks').insert({
     name:n, owner,
     due_date:document.getElementById('tDue').value||null,
@@ -2092,7 +2116,7 @@ function renderDocs() {
       const docStatus   = d.doc_status || (isDone ? 'done' : 'inprogress');
       const stepComments = d.step_comments || {};
 
-      const canStepComment = isSuperior() || myEmailPrefix() === (d.created_by||'');
+      const canStepComment = isSuperior() || matchesMe(d.created_by);
       const stepsHtml = steps.map((s,i)=>{
         const done    = i < d.current_step || isDone;
         const current = i === d.current_step && !isDone && !isCancelled;
@@ -2200,7 +2224,7 @@ function openDocHistory(docId) {
     const coms    = stepComments[i]||[];
     const stepColor = done ? '#0F6E56' : current ? '#185FA5' : '#999';
     const stepBg   = done ? '#E1F5EE' : current ? '#E6F1FB' : '#F1EFE8';
-    const canStepComment = isSuperior() || myEmailPrefix()===(d.created_by||'');
+    const canStepComment = isSuperior() || matchesMe(d.created_by);
 
     html += `<div style="display:flex;gap:12px;margin-bottom:16px">
       <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
@@ -2269,7 +2293,7 @@ async function saveStepComment() {
   const existing = data.step_comments || {};
   const stepComs = existing[stepIdx] || [];
   stepComs.push({
-    by:  myEmailPrefix() || 'unknown',
+    by:  myEmail() || 'unknown',
     text: text,
     at:  new Date().toLocaleString('lo-LA')
   });
@@ -2334,7 +2358,7 @@ async function saveEditDoc() {
   const n  = document.getElementById('eDName').value.trim();
   if(!n){ toast('⚠️ ໃສ່ຊື່ເອກະສານ'); return; }
   const steps  = document.getElementById('eDSteps').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const from   = document.getElementById('eDFrom').value||'—';
+  const from   = normalizeUserRef(document.getElementById('eDFrom').value, myEmail());
   const to     = document.getElementById('eDTo').value||'—';
   const docNum = document.getElementById('eDNumber').value.trim()||null;
   const docDir = document.getElementById('eDDir').value||'in';
@@ -2391,7 +2415,7 @@ async function saveDoc() {
   const rawSteps = document.getElementById('dSteps').value;
   const steps    = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
   const fromRaw  = document.getElementById('dFrom').value.trim();
-  const created_by  = fromRaw || myEmailPrefix() || '—';
+  const created_by  = normalizeUserRef(fromRaw, myEmail());
   const doc_number  = document.getElementById('dNumber').value.trim() || null;
   const doc_direction = document.getElementById('dDir').value || 'in';
 
@@ -2698,7 +2722,7 @@ const leaveStatusMap = {
 
 async function populateLeaveOwnerDropdowns() {
   const users = await loadUserOptions();
-  const meVal = myEmailPrefix();
+  const meVal = myEmail();
   const opts = users.map(u =>
     `<option value="${u.value}" ${u.value===meVal?'selected':''}>${u.label}</option>`
   ).join('');
@@ -2817,7 +2841,7 @@ function renderLeave() {
             <button onclick="approveLeave(${l.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ອະນຸມັດ</button>
             <button onclick="rejectLeave(${l.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">❌ ປະຕິເສດ</button>
           ` : ''}
-          ${(isSuperior() || myEmailPrefix() === (l.owner||'')) && l.status==='pending' ? `
+          ${(isSuperior() || matchesMe(l.owner)) && l.status==='pending' ? `
             <button onclick="openEditLeave(${l.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
           ` : ''}
           ${isSuperior() ? `
@@ -2830,7 +2854,7 @@ function renderLeave() {
 }
 
 async function saveLeave() {
-  const owner = document.getElementById('lOwner').value.trim() || myEmailPrefix() || '—';
+  const owner = normalizeUserRef(document.getElementById('lOwner').value, myEmail());
   const lType = document.getElementById('lType').value;
   const dFrom = document.getElementById('lFrom').value;
   const dTo   = document.getElementById('lTo').value;
@@ -2874,7 +2898,7 @@ async function openEditLeave(id) {
 
 async function saveEditLeave() {
   const id    = parseInt(document.getElementById('editLeaveId').value);
-  const owner = document.getElementById('eLOwner').value.trim();
+  const owner = normalizeUserRef(document.getElementById('eLOwner').value, myEmail());
   const lType = document.getElementById('eLType').value;
   const dFrom = document.getElementById('eLFrom').value;
   const dTo   = document.getElementById('eLTo').value;
@@ -3008,9 +3032,9 @@ function closeBalanceModal() {
 }
 
 async function loadBalanceForUser() {
-  const owner = document.getElementById('balOwner').value;
-  if (!owner) return;
-  const existing = allLeaveBalance.find(b => b.owner === owner);
+  const owner = normalizeUserRef(document.getElementById('balOwner').value, myEmail());
+  if (!owner || owner === '—') return;
+  const existing = allLeaveBalance.find(b => String(b.owner).toLowerCase() === owner);
   if (existing) {
     document.getElementById('balTotal').value  = existing.total_days ?? 15;
     document.getElementById('balUsed').value   = existing.used_days  ?? 0;
@@ -3023,11 +3047,11 @@ async function loadBalanceForUser() {
 }
 
 async function saveBalance() {
-  const owner = document.getElementById('balOwner').value;
-  if (!owner) { toast('⚠️ ເລືອກພະນັກງານກ່ອນ'); return; }
+  const owner = normalizeUserRef(document.getElementById('balOwner').value, myEmail());
+  if (!owner || owner === '—') { toast('⚠️ ເລືອກພະນັກງານກ່ອນ'); return; }
   const total = parseFloat(document.getElementById('balTotal').value)||0;
   const used  = parseFloat(document.getElementById('balUsed').value)||0;
-  const existing = allLeaveBalance.find(b => b.owner === owner);
+  const existing = allLeaveBalance.find(b => String(b.owner).toLowerCase() === owner);
   let error;
   if (existing) {
     ({ error } = await db.from('leave_balance').update({ total_days:total, used_days:used }).eq('owner', owner));
