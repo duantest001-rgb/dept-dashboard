@@ -1523,9 +1523,6 @@ function clearSearch() {
 }
 
 // ── EXPORT CSV ────────────────────────────────────
-function exportXLSX() {
-  const statusMap   = {inprogress:'ດຳເນີນການ', done:'ສຳເລັດ', blocked:'ຕິດຂັດ', todo:'ລໍຖ້າ', review:'ກວດສອບ'};
-
 // Document workflow status helper
 // ສຳຄັນ: ຂັ້ນຕອນສຸດທ້າຍ ≠ ສຳເລັດ.
 // ເອກະສານຈະສຳເລັດກໍຕໍ່ເມື່ອ doc_status === 'done' ເທົ່ານັ້ນ.
@@ -1553,6 +1550,10 @@ function isDocAtFinalStep(doc) {
   const lastIndex = Math.max(steps.length - 1, 0);
   return Number(doc?.current_step || 0) >= lastIndex;
 }
+
+
+function exportXLSX() {
+  const statusMap   = {inprogress:'ດຳເນີນການ', done:'ສຳເລັດ', blocked:'ຕິດຂັດ', todo:'ລໍຖ້າ', review:'ກວດສອບ'};
 
   const priorityMap = {high:'ສູງ 🔴', normal:'ປົກກະຕິ 🟡', low:'ຕ່ຳ 🟢', urgent:'ດ່ວນ 🔴'};
 
