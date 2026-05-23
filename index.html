@@ -1040,6 +1040,17 @@ function normalizeUserRef(value, fallbackEmail = myEmail()) {
   return found?.email || found?.value || v;
 }
 
+function requireEmailRef(value, fallbackEmail = myEmail(), fieldLabel = 'user') {
+  const normalized = normalizeUserRef(value, fallbackEmail);
+  const email = String(normalized || '').trim().toLowerCase();
+  if (!email || email === '—' || !email.includes('@')) {
+    console.error('Invalid user reference for save:', { fieldLabel, value, normalized, fallbackEmail });
+    toast(`⚠️ ${fieldLabel} ຕ້ອງເປັນ email ເຊັ່ນ pou@bd.com`);
+    return null;
+  }
+  return email;
+}
+
 function matchesMe(value) {
   const v = String(value || '').trim().toLowerCase();
   return !!v && (v === myEmail() || v === myEmailKey());
@@ -1702,9 +1713,14 @@ async function populateUserSelect(selectId, currentVal, lockToSelf) {
   if (!sel) return;
   const me = myEmail();
   const selectedVal = String(currentVal || me || '').trim().toLowerCase();
-  sel.innerHTML = opts.length === 0
-    ? `<option value="${h(me)}">${h(me)} (ທ່ານ)</option>`
-    : opts.map(o => `<option value="${h(o.value)}" ${o.value === selectedVal ? 'selected' : ''}>
+  let finalOpts = [...opts];
+  if (selectedVal && selectedVal.includes('@') && !finalOpts.some(o => o.value === selectedVal)) {
+    finalOpts.push({ value:selectedVal, label:selectedVal, email:selectedVal, role:'employee' });
+  }
+  if (finalOpts.length === 0 && me) {
+    finalOpts = [{ value:me, label:`${me} (ທ່ານ)`, email:me, role:currentRole }];
+  }
+  sel.innerHTML = finalOpts.map(o => `<option value="${h(o.value)}" ${o.value === selectedVal ? 'selected' : ''}>
         ${h(o.label)}${o.value === me ? ' (ທ່ານ)' : ''}
       </option>`).join('');
   if (lockToSelf && me) sel.value = me;
@@ -2030,9 +2046,11 @@ async function saveEditTask() {
   const id = parseInt(document.getElementById('editTaskId').value);
   const n = document.getElementById('eName').value.trim();
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກ');return;}
+  const taskOwnerEmail = requireEmailRef(document.getElementById('eOwner').value, myEmail(), 'ຜູ້ຮັບຜິດຊອບ');
+  if (!taskOwnerEmail) return;
   const {error} = await db.from('tasks').update({
     name:n,
-    owner: normalizeUserRef(document.getElementById('eOwner').value, myEmail()),
+    owner: taskOwnerEmail,
     due_date:document.getElementById('eDue').value||null,
     priority:document.getElementById('ePri').value,
     status:document.getElementById('eStatus').value,
@@ -2094,7 +2112,8 @@ async function saveTask() {
   btn.disabled=true; btn.textContent='ກຳລັງບັນທຶກ...';
   // Normalize owner — always save full email so frontend stays synced with RLS
   const ownerRaw = document.getElementById('tOwner').value.trim();
-  const owner = normalizeUserRef(ownerRaw, myEmail());
+  const owner = requireEmailRef(ownerRaw, myEmail(), 'ຜູ້ຮັບຜິດຊອບ');
+  if (!owner) { btn.disabled=false; btn.textContent='💾 ບັນທຶກ'; return; }
   const {data, error} = await db.from('tasks').insert({
     name:n, owner,
     due_date:document.getElementById('tDue').value||null,
@@ -2392,7 +2411,8 @@ async function saveEditDoc() {
   const n  = document.getElementById('eDName').value.trim();
   if(!n){ toast('⚠️ ໃສ່ຊື່ເອກະສານ'); return; }
   const steps  = document.getElementById('eDSteps').value.split(',').map(s=>s.trim()).filter(Boolean);
-  const from   = normalizeUserRef(document.getElementById('eDFrom').value, myEmail());
+  const from   = requireEmailRef(document.getElementById('eDFrom').value, myEmail(), 'ຜູ້ສ້າງເອກະສານ');
+  if (!from) return;
   const to     = document.getElementById('eDTo').value||'—';
   const docNum = document.getElementById('eDNumber').value.trim()||null;
   const docDir = document.getElementById('eDDir').value||'in';
@@ -2450,7 +2470,8 @@ async function saveDoc() {
   const rawSteps = document.getElementById('dSteps').value;
   const steps    = rawSteps.split(',').map(s=>s.trim()).filter(Boolean);
   const fromRaw  = document.getElementById('dFrom').value.trim();
-  const created_by  = normalizeUserRef(fromRaw, myEmail());
+  const created_by  = requireEmailRef(fromRaw, myEmail(), 'ຜູ້ສ້າງເອກະສານ');
+  if (!created_by) return;
   const doc_number  = document.getElementById('dNumber').value.trim() || null;
   const doc_direction = document.getElementById('dDir').value || 'in';
 
@@ -2892,7 +2913,8 @@ function renderLeave() {
 
 async function saveLeave() {
   if (!canWrite()) return toast('⛔ Viewer ເບິ່ງໄດ້ຢ່າງດຽວ');
-  const owner = normalizeUserRef(document.getElementById('lOwner').value, myEmail());
+  const owner = requireEmailRef(document.getElementById('lOwner').value, myEmail(), 'ຜູ້ຂໍລາ');
+  if (!owner) return;
   const lType = document.getElementById('lType').value;
   const dFrom = document.getElementById('lFrom').value;
   const dTo   = document.getElementById('lTo').value;
@@ -2938,7 +2960,8 @@ async function saveEditLeave() {
   const leave = allLeaves.find(l => l.id == document.getElementById('editLeaveId').value);
   if (!(isSuperior() || (leave && matchesMe(leave.owner) && leave.status === 'pending'))) return toast('⛔ ບໍ່ມີສິດແກ້ໃບລານີ້');
   const id    = parseInt(document.getElementById('editLeaveId').value);
-  const owner = normalizeUserRef(document.getElementById('eLOwner').value, myEmail());
+  const owner = requireEmailRef(document.getElementById('eLOwner').value, myEmail(), 'ຜູ້ຂໍລາ');
+  if (!owner) return;
   const lType = document.getElementById('eLType').value;
   const dFrom = document.getElementById('eLFrom').value;
   const dTo   = document.getElementById('eLTo').value;
@@ -3089,8 +3112,8 @@ async function loadBalanceForUser() {
 }
 
 async function saveBalance() {
-  const owner = normalizeUserRef(document.getElementById('balOwner').value, myEmail());
-  if (!owner || owner === '—') { toast('⚠️ ເລືອກພະນັກງານກ່ອນ'); return; }
+  const owner = requireEmailRef(document.getElementById('balOwner').value, myEmail(), 'ພະນັກງານ');
+  if (!owner) return;
   const total = parseFloat(document.getElementById('balTotal').value)||0;
   const used  = parseFloat(document.getElementById('balUsed').value)||0;
   const existing = allLeaveBalance.find(b => String(b.owner).toLowerCase() === owner);
