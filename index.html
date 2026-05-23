@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard ພະແນກພັດທະນາທຸລະກິດ</title>
-<!-- Patch v3: UI Permission Cleanup - frontend buttons/forms follow profiles.role and RLS -->
+<!-- Patch v7: Meeting participants use profile email multiselect + role/RLS sync -->
 <!-- GitHub-ready single-file app. Use Supabase RLS before real deployment. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -581,7 +581,10 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row"><label>ເວລາ</label><input type="time" id="mTime"></div>
       </div>
       <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="mLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
-      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="mAtt" placeholder="ສສ,ບທ,ມລ..."></div>
+      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ</label>
+          <select id="mAtt" multiple size="4" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%"></select>
+          <small style="font-size:11px;color:var(--muted)">ເລືອກໄດ້ຫຼາຍຄົນ — ລະບົບຈະບັນທຶກເປັນ email ເຊັ່ນ pou@bd.com</small>
+        </div>
       <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="mNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
       <div class="btn-row">
         <button class="btn-primary" onclick="saveMeet()">💾 ບັນທຶກ</button>
@@ -607,7 +610,10 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
         <div class="form-row"><label>ເວລາ</label><input type="time" id="eMTime"></div>
       </div>
       <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="eMLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
-      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eMAtt" placeholder="ສສ,ບທ,ມລ..."></div>
+      <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ</label>
+          <select id="eMAtt" multiple size="4" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%"></select>
+          <small style="font-size:11px;color:var(--muted)">ເກັບເປັນ email ເພື່ອໃຫ້ permission/RLS ຖືກຕ້ອງ</small>
+        </div>
       <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="eMNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
       <div class="btn-row">
         <button class="btn-primary" data-manager-only onclick="saveEditMeet()">💾 ບັນທຶກການແກ້ໄຂ</button>
@@ -1485,6 +1491,58 @@ function exportXLSX() {
   XLSX.writeFile(wb, `tasks_${date}.xlsx`);
   toast('📥 Export Excel ສຳເລັດ!');
 }
+
+// ════ MEETING PARTICIPANTS HELPERS ════
+// Store participants as email array, not Lao names or comma text.
+function normalizeParticipants(value) {
+  let arr = [];
+  if (Array.isArray(value)) arr = value;
+  else if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      arr = Array.isArray(parsed) ? parsed : value.split(',');
+    } catch (_) {
+      arr = value.split(',');
+    }
+  }
+  return [...new Set(arr
+    .map(v => requireEmailRef(v, '', 'ຜູ້ເຂົ້າຮ່ວມ'))
+    .filter(Boolean)
+    .map(v => String(v).trim().toLowerCase()))];
+}
+
+function selectedParticipantEmails(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return [];
+  return [...sel.selectedOptions]
+    .map(o => String(o.value || '').trim().toLowerCase())
+    .filter(v => v.includes('@'));
+}
+
+async function populateParticipantSelect(selectId, selected = []) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const opts = await loadUserOptions();
+  const selectedEmails = new Set(normalizeParticipants(selected));
+  if (selectedEmails.size === 0 && selectId === 'mAtt' && myEmail()) {
+    selectedEmails.add(myEmail());
+  }
+  sel.innerHTML = opts.map(o => `<option value="${h(o.email)}" ${selectedEmails.has(o.email) ? 'selected' : ''}>${h(o.label)}</option>`).join('');
+}
+
+function participantLabel(email) {
+  const e = String(email || '').trim().toLowerCase();
+  const found = (cachedUserOptions || []).find(u => u.email === e);
+  return found?.label || e || '—';
+}
+
+function participantInitial(email) {
+  const label = participantLabel(email).split('(')[0].trim();
+  const key = String(email || label || '?').trim();
+  if (key.includes('@')) return key.split('@')[0].slice(0, 2).toUpperCase();
+  return key.slice(0, 2).toUpperCase();
+}
+
 
 // ════ ADMIN ════
 let allUsers = [];
@@ -2572,6 +2630,7 @@ async function loadMeet() {
     const {data, error} = await db.from('meetings').select('*').order('meet_date');
     if (error) throw error;
     allMeets = data||[];
+    await populateParticipantSelect('mAtt', [myEmail()]);
     renderMeet();
   } catch (error) {
     logDbError('loadMeet', error);
@@ -2609,8 +2668,8 @@ function renderMeet() {
   document.getElementById('meetList').innerHTML = meets.length===0
     ? '<div class="empty">ບໍ່ພົບລາຍການ</div>'
     : meets.map(m=>{
-      const att = m.attendees||[];
-      const avatars = att.map((a,i)=>`<div class="avatar" style="background:${acBg[i%5]};color:${acText[i%5]}">${a}</div>`).join('');
+      const att = normalizeParticipants(m.attendees || []);
+      const avatars = att.map((a,i)=>`<div class="avatar" title="${h(participantLabel(a))}" style="background:${acBg[i%5]};color:${acText[i%5]}">${h(participantInitial(a))}</div>`).join('');
       const tp  = m.meet_type||'ກອງປະຊຸມ';
       const tm  = typeMap[tp]||{icon:'📅', bg:'#F1EFE8', color:'#5F5E5A'};
       const st  = m.meet_status||'scheduled';
@@ -2652,7 +2711,7 @@ function renderMeet() {
     }).join('');
 }
 
-function openEditMeet(id) {
+async function openEditMeet(id) {
   const m = allMeets.find(x=>x.id===id);
   if(!m) return;
   document.getElementById('editMeetId').value  = id;
@@ -2661,7 +2720,7 @@ function openEditMeet(id) {
   document.getElementById('eMDate').value      = m.meet_date;
   document.getElementById('eMTime').value      = m.meet_time;
   document.getElementById('eMLoc').value       = m.location||'';
-  document.getElementById('eMAtt').value       = (m.attendees||[]).join(',');
+  await populateParticipantSelect('eMAtt', normalizeParticipants(m.attendees||[]));
   document.getElementById('eMNote').value      = m.notes||'';
   const form = document.getElementById('editMeetForm');
   form.style.display = 'block';
@@ -2673,7 +2732,8 @@ async function saveEditMeet() {
   const id = parseInt(document.getElementById('editMeetId').value);
   const t  = document.getElementById('eMTitle').value.trim();
   if(!t){ toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
-  const att = document.getElementById('eMAtt').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const att = selectedParticipantEmails('eMAtt');
+  if (att.length === 0) { toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ'); return; }
   const tp  = document.getElementById('eMType').value;
   const {error} = await db.from('meetings').update({
     title:t,
@@ -2686,7 +2746,7 @@ async function saveEditMeet() {
   }).eq('id',id);
   if(error){ toast('❌ '+error.message); return; }
   await logAction('updated','meeting', id, t,
-    `[${tp}] ${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value}`);
+    `[${tp}] ${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value} | participants: ${att.join(', ')}`);
   toast('✅ ແກ້ໄຂສຳເລັດ!');
   document.getElementById('editMeetForm').style.display = 'none';
   loadMeet();
@@ -2781,7 +2841,7 @@ async function savePostponeMeet() {
       meet_time: newTime||m.meet_time||null,
       location:  m.location,
       notes:     m.notes,
-      attendees: m.attendees,
+      attendees: normalizeParticipants(m.attendees),
       meet_type: m.meet_type,
       meet_status: 'scheduled'
     });
@@ -2826,8 +2886,8 @@ async function saveMeet() {
   if (!canManageMeetings()) return toast('⛔ ສະເພາະ Admin/Manager ເພີ່ມນັດໝາຍໄດ້');
   const t = document.getElementById('mTitle').value.trim();
   if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
-  const rawAtt = document.getElementById('mAtt').value;
-  const att = rawAtt.split(',').map(s=>s.trim()).filter(Boolean);
+  const att = selectedParticipantEmails('mAtt');
+  if (att.length === 0) { toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ'); return; }
   const tp = document.getElementById('mType').value;
   const {error} = await db.from('meetings').insert({
     title:t, meet_date:document.getElementById('mDate').value||null,
@@ -2838,10 +2898,11 @@ async function saveMeet() {
   });
   if(error){toast('❌ '+error.message);return;}
   await logAction('created','meeting', 0, t,
-    `[${tp}] ${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value}`);
+    `[${tp}] ${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value} | participants: ${att.join(', ')}`);
   toast('✅ ບັນທຶກສຳເລັດ!');
   toggleForm('addMeetForm');
-  ['mTitle','mLoc','mAtt','mNote'].forEach(id=>document.getElementById(id).value='');
+  ['mTitle','mLoc','mNote'].forEach(id=>document.getElementById(id).value='');
+  await populateParticipantSelect('mAtt', [myEmail()]);
   loadMeet();
 }
 
