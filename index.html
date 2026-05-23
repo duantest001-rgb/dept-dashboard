@@ -148,6 +148,26 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 .search-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1rem}
 .search-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-top:10px}
 
+
+/* ── My Profile Dashboard ── */
+.profile-hero{background:linear-gradient(135deg,var(--card),#f3fbf8);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem;display:flex;gap:14px;align-items:center;box-shadow:0 8px 20px rgba(0,0,0,.04)}
+.profile-avatar{width:64px;height:64px;border-radius:20px;background:var(--c1);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex-shrink:0}
+.profile-name{font-size:18px;font-weight:700;margin-bottom:4px}
+.profile-sub{font-size:13px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.profile-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;background:var(--c2l);color:var(--c2m)}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:1rem}
+.profile-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem;display:flex;align-items:center;gap:10px}
+.profile-stat-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.profile-stat-num{font-size:22px;font-weight:800;line-height:1}
+.profile-stat-label{font-size:11px;color:var(--muted);margin-top:4px}
+.profile-list{display:grid;gap:8px}
+.profile-mini-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.profile-mini-item:last-child{border-bottom:none}
+.profile-item-title{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-item-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.profile-status-dot{width:8px;height:8px;border-radius:50%;background:var(--c1);display:inline-block}
+@media(max-width:580px){.profile-hero{align-items:flex-start}.profile-avatar{width:54px;height:54px;border-radius:16px;font-size:20px}}
+
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -225,6 +245,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 
     <nav class="nav">
       <button class="active" onclick="showPage('dash',this)"><i class="ti ti-home"></i> Overview</button>
+      <button onclick="showPage('profile',this)"><i class="ti ti-user-circle"></i> My Profile</button>
       <button onclick="showPage('tasks',this)"><i class="ti ti-checkbox"></i> ໜ້າວຽກ</button>
       <button onclick="showPage('docs',this)"><i class="ti ti-file-text"></i> ເອກະສານ</button>
       <button onclick="showPage('meet',this)"><i class="ti ti-calendar-event"></i> ນັດໝາຍ</button>
@@ -303,6 +324,55 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div id="announceArea"></div>
     </div>
   </div>
+
+
+  <!-- ── MY PROFILE ── -->
+  <div class="page" id="page-profile">
+    <div id="profileHero" class="profile-hero">
+      <div class="profile-avatar" id="profileAvatar">?</div>
+      <div style="flex:1;min-width:0">
+        <div class="profile-name" id="profileName">My Profile</div>
+        <div class="profile-sub">
+          <span class="profile-chip" id="profileRoleChip"><i class="ti ti-shield"></i> Role</span>
+          <span><i class="ti ti-mail"></i> <span id="profileEmail">-</span></span>
+          <span><span class="profile-status-dot"></span> Active</span>
+        </div>
+      </div>
+      <button class="btn-outline" onclick="loadProfileDashboard()" style="font-size:12px"><i class="ti ti-refresh"></i> Refresh</button>
+    </div>
+
+    <div class="profile-grid" id="profileStats">
+      <div class="spinner">ໂຫຼດ...</div>
+    </div>
+
+    <div class="row2">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-checkbox" style="color:var(--c2)"></i> ວຽກຂອງຂ້ອຍ</div>
+        <div id="profileTasks"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-calendar-event" style="color:var(--c5)"></i> ນັດໝາຍຂອງຂ້ອຍ</div>
+        <div id="profileMeetings"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+    </div>
+
+    <div class="row2">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-file-text" style="color:var(--c3)"></i> ເອກະສານຂອງຂ້ອຍ</div>
+        <div id="profileDocs"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="ti ti-calendar-off" style="color:var(--c1)"></i> ການລາຂອງຂ້ອຍ</div>
+        <div id="profileLeave"><div class="spinner">ໂຫຼດ...</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><i class="ti ti-history" style="color:var(--c4)"></i> Activity ຂອງຂ້ອຍ</div>
+      <div id="profileActivity"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+  </div>
+
 
   <!-- ── TASKS ── -->
   <div class="page" id="page-tasks">
@@ -1807,7 +1877,7 @@ function showPage(p, btn) {
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   if(btn) btn.classList.add('active');
-  const map = {dash:loadDash, tasks:loadTasks, docs:loadDocs, meet:loadMeet, leave:loadLeave, report:loadReport, log:loadLog, admin:loadAdmin};
+  const map = {dash:loadDash, profile:loadProfileDashboard, tasks:loadTasks, docs:loadDocs, meet:loadMeet, leave:loadLeave, report:loadReport, log:loadLog, admin:loadAdmin};
   if(map[p]) map[p]();
 }
 
@@ -1940,6 +2010,103 @@ async function deleteAnnouncement(id) {
   toast('🗑️ ລຶບປະກາດສຳເລັດ');
   loadDash();
 }
+
+
+// ════ MY PROFILE DASHBOARD ════
+function profileInitial(email) {
+  const key = String(email || '?').trim();
+  return (key[0] || '?').toUpperCase();
+}
+
+function renderProfileMiniList(items, emptyText, renderer) {
+  if (!items || !items.length) return `<div class="empty">${h(emptyText)}</div>`;
+  return `<div class="profile-list">${items.map(renderer).join('')}</div>`;
+}
+
+async function loadProfileDashboard() {
+  try {
+    if (!currentProfile) await loadUserProfile();
+    const email = myEmail();
+    if (!email) {
+      showMultiError(['profileStats','profileTasks','profileMeetings','profileDocs','profileLeave','profileActivity'], 'Profile', 'No user email');
+      return;
+    }
+
+    const name = currentProfile?.full_name || email.split('@')[0];
+    $('profileAvatar').textContent = profileInitial(name || email);
+    $('profileName').textContent = name;
+    $('profileEmail').textContent = email;
+    $('profileRoleChip').innerHTML = `<i class="ti ti-shield"></i> ${h(formatRoleLabel(currentRole))}`;
+
+    const [tasksRes, docsRes, meetsRes, leavesRes, balRes, logRes] = await Promise.all([
+      db.from('tasks').select('*').order('created_at', { ascending:false }),
+      db.from('documents').select('*').order('created_at', { ascending:false }),
+      db.from('meetings').select('*').order('meet_date', { ascending:true }),
+      db.from('leaves').select('*').order('from_date', { ascending:false }),
+      db.from('leave_balance').select('*').eq('owner', email).maybeSingle(),
+      db.from('activity_log').select('*').eq('user_email', email).order('created_at', { ascending:false }).limit(8)
+    ]);
+
+    const firstErr = tasksRes.error || docsRes.error || meetsRes.error || leavesRes.error || balRes.error || logRes.error;
+    if (firstErr) throw firstErr;
+
+    const myTasks = (tasksRes.data || []).filter(t => matchesMe(t.owner));
+    const myDocs  = (docsRes.data || []).filter(d => matchesMe(d.created_by));
+    const myLeaves= (leavesRes.data || []).filter(l => matchesMe(l.owner));
+    const myMeets = (meetsRes.data || []).filter(m => {
+      const attendees = normalizeParticipants(m.attendees || []);
+      return attendees.includes(email) || matchesMe(m.created_by);
+    });
+    const balance = balRes.data || null;
+    const myLogs = logRes.data || [];
+
+    const openTasks = myTasks.filter(t => t.status !== 'done').length;
+    const urgentTasks = myTasks.filter(t => t.priority === 'urgent' && t.status !== 'done').length;
+    const pendingDocs = myDocs.filter(d => (Number(d.current_step || 0) < ((d.steps || []).length - 1))).length;
+    const upcomingMeets = myMeets.filter(m => !m.meet_status || m.meet_status === 'scheduled').length;
+
+    $('profileStats').innerHTML = `
+      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c2l);color:var(--c2m)"><i class="ti ti-checkbox"></i></div><div><div class="profile-stat-num">${myTasks.length}</div><div class="profile-stat-label">ວຽກຂອງຂ້ອຍ · ${openTasks} open</div></div></div>
+      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c3l);color:var(--c3m)"><i class="ti ti-file-text"></i></div><div><div class="profile-stat-num">${myDocs.length}</div><div class="profile-stat-label">ເອກະສານ · ${pendingDocs} pending</div></div></div>
+      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c5l);color:var(--c5m)"><i class="ti ti-calendar-event"></i></div><div><div class="profile-stat-num">${myMeets.length}</div><div class="profile-stat-label">ນັດໝາຍ · ${upcomingMeets} upcoming</div></div></div>
+      <div class="profile-stat"><div class="profile-stat-icon" style="background:var(--c1l);color:var(--c1m)"><i class="ti ti-calendar-off"></i></div><div><div class="profile-stat-num">${balance?.remaining ?? '-'}</div><div class="profile-stat-label">ວັນລາຄົງເຫຼືອ</div></div></div>
+    `;
+
+    $('profileTasks').innerHTML = renderProfileMiniList(
+      myTasks.slice(0,6),
+      'ຍັງບໍ່ມີວຽກຂອງຂ້ອຍ',
+      t => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(t.name || t.title || '-')}</div><div class="profile-item-meta">${h(t.status || '-')} · ${h(t.due_date || 'no due')}</div></div><span class="badge ${t.priority === 'urgent' ? 'urgent' : 'normal'}">${t.priority === 'urgent' ? 'ດ່ວນ' : 'ປົກກະຕິ'}</span></div>`
+    );
+
+    $('profileDocs').innerHTML = renderProfileMiniList(
+      myDocs.slice(0,6),
+      'ຍັງບໍ່ມີເອກະສານຂອງຂ້ອຍ',
+      d => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(d.name || '-')}</div><div class="profile-item-meta">${h(d.doc_no || d.number || '')} · step ${Number(d.current_step || 0)+1}/${(d.steps || []).length || 1}</div></div><span>${h(d.type || '📄')}</span></div>`
+    );
+
+    $('profileMeetings').innerHTML = renderProfileMiniList(
+      myMeets.slice(0,6),
+      'ຍັງບໍ່ມີນັດໝາຍຂອງຂ້ອຍ',
+      m => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(m.title || '-')}</div><div class="profile-item-meta">${h(m.meet_date || '-')} ${h(m.meet_time || '')} · ${h(m.location || '')}</div></div><span class="badge normal">${h(m.meet_status || 'scheduled')}</span></div>`
+    );
+
+    $('profileLeave').innerHTML = `
+      <div style="display:grid;gap:8px">
+        <div class="profile-mini-item"><div><div class="profile-item-title">ວັນລາຄົງເຫຼືອ</div><div class="profile-item-meta">Balance</div></div><strong>${h(balance?.remaining ?? '-')}</strong></div>
+        ${renderProfileMiniList(myLeaves.slice(0,4), 'ຍັງບໍ່ມີລາຍການຂໍລາ', l => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(l.type || '-')}</div><div class="profile-item-meta">${h(l.from_date || '')} → ${h(l.to_date || '')}</div></div><span class="badge ${l.status === 'approved' ? 'done-b' : l.status === 'rejected' ? 'urgent' : 'inprogress'}">${h(l.status || 'pending')}</span></div>`)}
+      </div>`;
+
+    $('profileActivity').innerHTML = renderProfileMiniList(
+      myLogs,
+      'ຍັງບໍ່ມີ Activity',
+      l => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(l.action || '-')} ${h(l.target_name || '')}</div><div class="profile-item-meta">${new Date(l.created_at).toLocaleString('lo-LA')} · ${h(l.target_type || '')}</div></div><i class="ti ti-chevron-right" style="color:var(--muted)"></i></div>`
+    );
+  } catch (error) {
+    logDbError('loadProfileDashboard', error);
+    showMultiError(['profileStats','profileTasks','profileMeetings','profileDocs','profileLeave','profileActivity'], 'ໂຫຼດ My Profile ບໍ່ສຳເລັດ', error);
+  }
+}
+
 
 // ════ DASHBOARD ════
 async function loadDash() {
