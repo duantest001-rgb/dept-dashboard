@@ -216,7 +216,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <button onclick="showPage('report',this)"><i class="ti ti-chart-bar"></i> ລາຍງານ</button>
       <button onclick="showPage('log',this)"><i class="ti ti-history"></i> Activity</button>
       <button onclick="showPage('leave',this)"><i class="ti ti-calendar-off"></i> ລາພັກ</button>
-      <button id="adminNavBtn" onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
+      <button id="adminNavBtn" data-admin-only onclick="showPage('admin',this)" style="display:none"><i class="ti ti-shield-lock"></i> Admin</button>
     </nav>
   </div>
 
@@ -1107,10 +1107,22 @@ async function loadUserProfile() {
 
 function setVisible(el, visible, fallbackDisplay = '') {
   if (!el) return;
+
+  // IMPORTANT:
+  // Many buttons are initially written as style="display:none".
+  // If we store "none" as the default display, they will never show again.
+  // So we store fallbackDisplay instead when initial display is none.
   if (el.dataset.defaultDisplay === undefined) {
-    el.dataset.defaultDisplay = el.style.display || fallbackDisplay;
+    const currentDisplay = (el.style.display || '').trim();
+    el.dataset.defaultDisplay =
+      currentDisplay && currentDisplay !== 'none'
+        ? currentDisplay
+        : (fallbackDisplay || '');
   }
-  el.style.display = visible ? (el.dataset.defaultDisplay || fallbackDisplay || '') : 'none';
+
+  el.style.display = visible
+    ? (el.dataset.defaultDisplay || fallbackDisplay || '')
+    : 'none';
 }
 
 function applyPermissionUI() {
@@ -1119,8 +1131,8 @@ function applyPermissionUI() {
   const superior = hasRole('admin','manager');
 
   // ===== NAV / MAIN ACTIONS =====
-  setVisible($('adminNavBtn'), hasRole('admin'), 'inline-block');
-  setVisible($('addAnnBtn'), superior, 'inline-block');
+  setVisible($('adminNavBtn'), hasRole('admin'), 'inline-flex');
+  setVisible($('addAnnBtn'), superior, 'inline-flex');
 
   // ===== ATTRIBUTE-BASED PERMISSIONS =====
   document.querySelectorAll('[data-admin-only]').forEach(el => {
