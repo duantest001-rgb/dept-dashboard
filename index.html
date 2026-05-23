@@ -1525,6 +1525,35 @@ function clearSearch() {
 // ── EXPORT CSV ────────────────────────────────────
 function exportXLSX() {
   const statusMap   = {inprogress:'ດຳເນີນການ', done:'ສຳເລັດ', blocked:'ຕິດຂັດ', todo:'ລໍຖ້າ', review:'ກວດສອບ'};
+
+// Document workflow status helper
+// ສຳຄັນ: ຂັ້ນຕອນສຸດທ້າຍ ≠ ສຳເລັດ.
+// ເອກະສານຈະສຳເລັດກໍຕໍ່ເມື່ອ doc_status === 'done' ເທົ່ານັ້ນ.
+function getDocWorkflowStatus(doc) {
+  if (!doc) return 'inprogress';
+  if (doc.doc_status === 'cancelled') return 'cancelled';
+  if (doc.doc_status === 'done') return 'done';
+  return 'inprogress';
+}
+
+function isDocDone(doc) {
+  return getDocWorkflowStatus(doc) === 'done';
+}
+
+function isDocCancelled(doc) {
+  return getDocWorkflowStatus(doc) === 'cancelled';
+}
+
+function isDocInProgress(doc) {
+  return getDocWorkflowStatus(doc) === 'inprogress';
+}
+
+function isDocAtFinalStep(doc) {
+  const steps = Array.isArray(doc?.steps) ? doc.steps : [];
+  const lastIndex = Math.max(steps.length - 1, 0);
+  return Number(doc?.current_step || 0) >= lastIndex;
+}
+
   const priorityMap = {high:'ສູງ 🔴', normal:'ປົກກະຕິ 🟡', low:'ຕ່ຳ 🟢', urgent:'ດ່ວນ 🔴'};
 
   // ── Sheet 1: ໜ້າວຽກ ──────────────────────────────────
@@ -2062,7 +2091,7 @@ async function loadProfileDashboard() {
 
     const openTasks = myTasks.filter(t => t.status !== 'done').length;
     const urgentTasks = myTasks.filter(t => t.priority === 'urgent' && t.status !== 'done').length;
-    const pendingDocs = myDocs.filter(d => (Number(d.current_step || 0) < ((d.steps || []).length - 1))).length;
+    const pendingDocs = myDocs.filter(d => isDocInProgress(d)).length;
     const upcomingMeets = myMeets.filter(m => !m.meet_status || m.meet_status === 'scheduled').length;
 
     $('profileStats').innerHTML = `
@@ -2134,7 +2163,7 @@ async function loadDash() {
   const done=allTasks.filter(t=>t.status==='done').length;
   const inprog=allTasks.filter(t=>t.status==='inprogress').length;
   const blk=allTasks.filter(t=>t.status==='blocked').length;
-  const pendDoc=allDocs.filter(d=>d.current_step<(d.steps||[]).length-1).length;
+  const pendDoc=allDocs.filter(d=>isDocInProgress(d)).length;
 
   document.getElementById('metricsBar').innerHTML=`
     <div class="metric"><div class="num" style="color:var(--c2)">${allTasks.length}</div><div class="lbl">ວຽກທັງໝົດ</div></div>
@@ -2190,7 +2219,7 @@ async function loadDash() {
         <br><span style="font-size:11px;color:var(--muted);margin-left:14px">${h(t.owner)} · ${t.due_date}</span>
       </div>`).join('');
 
-  const pendDocs = allDocs.filter(d=>d.current_step<(d.steps||[]).length-1);
+  const pendDocs = allDocs.filter(d=>isDocInProgress(d));
   document.getElementById('docPreview').innerHTML = pendDocs.length===0
     ? '<div class="empty">✅ ບໍ່ມີເອກະສານຄ້າງ</div>'
     : pendDocs.map(d=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:13px">
@@ -2503,8 +2532,8 @@ function renderDocs() {
   if (fromQ)   docs = docs.filter(d => (d.created_by||'').toLowerCase().includes(fromQ));
   if (typeQ)   docs = docs.filter(d => d.doc_type === typeQ);
   if (dirQ)    docs = docs.filter(d => (d.doc_direction||'in') === dirQ);
-  if (statusQ === 'done')       docs = docs.filter(d => d.doc_status === 'done' || d.current_step >= (d.steps||[]).length-1);
-  if (statusQ === 'inprogress') docs = docs.filter(d => !d.doc_status || d.doc_status === 'inprogress');
+  if (statusQ === 'done')       docs = docs.filter(d => isDocDone(d));
+  if (statusQ === 'inprogress') docs = docs.filter(d => isDocInProgress(d));
   if (statusQ === 'cancelled')  docs = docs.filter(d => d.doc_status === 'cancelled');
 
   const statusBadge = {
@@ -2517,9 +2546,10 @@ function renderDocs() {
     ? '<div class="empty">ບໍ່ພົບເອກະສານ</div>'
     : docs.map(d=>{
       const steps       = d.steps||[];
-      const isDone      = d.doc_status === 'done'      || d.current_step >= steps.length-1;
-      const isCancelled = d.doc_status === 'cancelled';
-      const docStatus   = d.doc_status || (isDone ? 'done' : 'inprogress');
+      const isDone      = isDocDone(d);
+      const isCancelled = isDocCancelled(d);
+      const isFinalStep = isDocAtFinalStep(d);
+      const docStatus   = getDocWorkflowStatus(d);
       const stepComments = d.step_comments || {};
 
       const canStepComment = isSuperior() || matchesMe(d.created_by);
@@ -2566,7 +2596,7 @@ function renderDocs() {
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <button onclick="openDocHistory(${d.id})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)"><i class="ti ti-history"></i> History</button>
             ${!isDone && !isCancelled && isSuperior()
-              ? `<button class="btn-outline" data-manager-only style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
+              ? `<button class="btn-outline" data-manager-only style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">${isFinalStep?'✅ ປິດສຳເລັດ':'➡️ ຜ່ານຂັ້ນຕໍ່ໄປ'}</button>` : ''}
             ${!isCancelled && canAdmin() && d.current_step > 0
               ? `<button data-admin-only onclick="revertDoc(${d.id},${d.current_step})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)" title="ຍ້ອນກັບຂັ້ນກ່ອນໜ້າ">◀ ຍ້ອນກັບ</button>` : ''}
             ${!isCancelled && isSuperior()
@@ -2611,9 +2641,9 @@ function openDocHistory(docId) {
   if (!d) return;
   const steps = d.steps||[];
   const stepComments = d.step_comments||{};
-  const isDone      = d.doc_status==='done' || d.current_step>=steps.length-1;
-  const isCancelled = d.doc_status==='cancelled';
-  const docStatus   = d.doc_status||(isDone?'done':'inprogress');
+  const isDone      = isDocDone(d);
+  const isCancelled = isDocCancelled(d);
+  const docStatus   = getDocWorkflowStatus(d);
   const statusLabel = {done:'✅ ສຳເລັດ', cancelled:'🚫 ຍົກເລີກ', inprogress:'🔄 ດຳເນີນຢູ່'}[docStatus]||'';
   const statusColor = {done:'#D4EDDA', cancelled:'#F8D7DA', inprogress:'#FFF3CD'}[docStatus]||'#FFF3CD';
 
@@ -2716,12 +2746,33 @@ async function saveStepComment() {
 }
 
 async function advanceDoc(id, cur, total) {
-  if(cur>=total-1) return;
   const doc = allDocs.find(d=>d.id===id);
-  await db.from('documents').update({current_step:cur+1}).eq('id',id);
-  const nextStep = (doc?.steps||[])[cur+1]||'';
+  if (!doc) return;
+
+  const lastIndex = Math.max((total || 1) - 1, 0);
+
+  // ຖ້າຢູ່ຂັ້ນສຸດທ້າຍແລ້ວ ໃຫ້ກົດອີກຄັ້ງເພື່ອປິດສຳເລັດ
+  // ບໍ່ໃຫ້ current_step ສຸດທ້າຍຖືກນັບເປັນ done ອັດຕະໂນມັດ.
+  if (cur >= lastIndex) {
+    const { error } = await db.from('documents')
+      .update({ current_step: lastIndex, doc_status: 'done' })
+      .eq('id', id);
+    if (error) { toast('❌ ' + error.message); return; }
+    await logAction('updated','document', id, doc?.name||'', 'doc_status → done');
+    toast('✅ ປິດເອກະສານສຳເລັດ!');
+    loadDocs();
+    return;
+  }
+
+  const nextStepIndex = cur + 1;
+  const { error } = await db.from('documents')
+    .update({ current_step: nextStepIndex, doc_status: 'inprogress' })
+    .eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+
+  const nextStep = (doc?.steps||[])[nextStepIndex]||'';
   await logAction('updated','document', id, doc?.name||'', `ຜ່ານຂັ້ນ → ${nextStep}`);
-  toast('📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  toast(nextStepIndex >= lastIndex ? '📄 ເຖິງຂັ້ນສຸດທ້າຍແລ້ວ — ກົດປິດສຳເລັດເມື່ອສຳເລັດຈິງ' : '📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
   loadDocs();
 }
 
@@ -2833,7 +2884,7 @@ async function saveDoc() {
   const {error} = await db.from('documents').insert({
     name:n, doc_type:tp, created_by,
     sent_to: document.getElementById('dTo').value||'—',
-    steps, current_step:0,
+    steps, current_step:0, doc_status:'inprogress',
     doc_number, doc_direction
   });
   if(error){toast('❌ '+error.message);return;}
@@ -3535,7 +3586,7 @@ async function loadReport() {
   });
 
   // ── Pending docs ──────────────────────────────────
-  const pendingDocs = d.filter(x => x.current_step < (x.steps||[]).length-1);
+  const pendingDocs = d.filter(x => isDocInProgress(x));
   const approvedDocs = d.length - pendingDocs.length;
 
   // ── Weekly completed (last 4 weeks) ───────────────
