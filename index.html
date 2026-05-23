@@ -57,6 +57,9 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .empty{text-align:center;padding:2rem;color:var(--muted);font-size:13px}
+.error-box{background:var(--c4l);color:var(--c4m);border:1px solid var(--c4);border-radius:var(--radius);padding:12px 14px;font-size:13px;margin:8px 0;line-height:1.5}
+.error-box code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:12px}
+.debug-small{font-size:11px;color:var(--muted);margin-top:6px;word-break:break-word}
 
 /* ── Task items ── */
 .task-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
@@ -1748,6 +1751,43 @@ function toast(msg) {
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
 
+// ════ ERROR / DEBUG HELPERS (v5) ════
+function errorMessage(error) {
+  if (!error) return '';
+  return error.message || error.details || error.hint || String(error);
+}
+
+function showInlineError(targetId, title, error) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  const msg = errorMessage(error) || 'Unknown error';
+  el.innerHTML = `
+    <div class="error-box">
+      <strong>❌ ${h(title || 'Load error')}</strong><br>
+      ${h(msg)}
+      <div class="debug-small">Target: <code>${h(targetId)}</code> · Role: <code>${h(currentProfile?.role || '-')}</code> · User: <code>${h(currentProfile?.email || '-')}</code></div>
+    </div>`;
+}
+
+function showMultiError(targetIds, title, error) {
+  (targetIds || []).forEach(id => showInlineError(id, title, error));
+}
+
+function logDbError(context, error) {
+  if (!error) return;
+  console.error(`[DB ERROR] ${context}`, error);
+  toast('❌ ' + (errorMessage(error) || context));
+}
+
+window.addEventListener('unhandledrejection', ev => {
+  console.error('[Unhandled Promise]', ev.reason);
+  toast('❌ ມີ error ໃນລະບົບ — ເບິ່ງ Console');
+});
+
+window.addEventListener('error', ev => {
+  console.error('[JS ERROR]', ev.error || ev.message);
+});
+
 // ── Colours ──
 const acBg  =['#E1F5EE','#E6F1FB','#FAEEDA','#EEEDFE','#FAECE7'];
 const acText=['#0F6E56','#185FA5','#854F0B','#534AB7','#993C1D'];
@@ -1780,12 +1820,23 @@ async function deleteAnnouncement(id) {
 
 // ════ DASHBOARD ════
 async function loadDash() {
-  const [tasksRes, docsRes, meetsRes, annRes] = await Promise.all([
-    db.from('tasks').select('*').order('created_at',{ascending:false}),
-    db.from('documents').select('*').order('created_at',{ascending:false}),
-    db.from('meetings').select('*').order('meet_date'),
-    db.from('announcements').select('*').order('created_at',{ascending:false}),
-  ]);
+  let tasksRes, docsRes, meetsRes, annRes;
+  try {
+    [tasksRes, docsRes, meetsRes, annRes] = await Promise.all([
+      db.from('tasks').select('*').order('created_at',{ascending:false}),
+      db.from('documents').select('*').order('created_at',{ascending:false}),
+      db.from('meetings').select('*').order('meet_date'),
+      db.from('announcements').select('*').order('created_at',{ascending:false}),
+    ]);
+    if (tasksRes.error) throw tasksRes.error;
+    if (docsRes.error) throw docsRes.error;
+    if (meetsRes.error) throw meetsRes.error;
+    if (annRes.error) throw annRes.error;
+  } catch (error) {
+    logDbError('loadDash', error);
+    showMultiError(['metricsBar','urgentPreview','docPreview','meetPreview','announceArea'], 'ໂຫຼດ Dashboard ບໍ່ສຳເລັດ', error);
+    return;
+  }
   allTasks = tasksRes.data||[];
   allDocs  = docsRes.data||[];
   allMeets = meetsRes.data||[];
@@ -1897,11 +1948,19 @@ async function loadDash() {
 
 // ════ TASKS ════
 async function loadTasks() {
-  const {data} = await db.from('tasks').select('*').order('created_at',{ascending:false});
-  allTasks = data||[];
-  renderTasks();
-  renderBlockers();
-  setTimeout(loadAllCommentPreviews, 100);
+  try {
+    const {data, error} = await db.from('tasks').select('*').order('created_at',{ascending:false});
+    if (error) throw error;
+    allTasks = data||[];
+    renderTasks();
+    renderBlockers();
+    setTimeout(loadAllCommentPreviews, 100);
+  } catch (error) {
+    logDbError('loadTasks', error);
+    showInlineError('taskList', 'ໂຫຼດວຽກບໍ່ສຳເລັດ', error);
+    showInlineError('blockerList', 'ໂຫຼດບັນຫາ/ຕິດຂັດບໍ່ສຳເລັດ', error);
+    document.getElementById('taskCount').textContent = '0';
+  }
 }
 
 function getDueInfo(due_date, status) {
@@ -2132,9 +2191,15 @@ async function saveTask() {
 
 // ════ DOCUMENTS ════
 async function loadDocs() {
-  const {data} = await db.from('documents').select('*').order('created_at',{ascending:false});
-  allDocs = data||[];
-  renderDocs();
+  try {
+    const {data, error} = await db.from('documents').select('*').order('created_at',{ascending:false});
+    if (error) throw error;
+    allDocs = data||[];
+    renderDocs();
+  } catch (error) {
+    logDbError('loadDocs', error);
+    showInlineError('docList', 'ໂຫຼດເອກະສານບໍ່ສຳເລັດ', error);
+  }
 }
 
 function renderDocs() {
@@ -2491,9 +2556,15 @@ async function saveDoc() {
 }
 // ════ MEETINGS ════
 async function loadMeet() {
-  const {data} = await db.from('meetings').select('*').order('meet_date');
-  allMeets = data||[];
-  renderMeet();
+  try {
+    const {data, error} = await db.from('meetings').select('*').order('meet_date');
+    if (error) throw error;
+    allMeets = data||[];
+    renderMeet();
+  } catch (error) {
+    logDbError('loadMeet', error);
+    showInlineError('meetList', 'ໂຫຼດນັດໝາຍບໍ່ສຳເລັດ', error);
+  }
 }
 
 function renderMeet() {
@@ -2801,16 +2872,25 @@ function getLeaveDisplayStatus(l) {
 let allLeaveBalance = []; // [{owner, total_days, used_days}]
 
 async function loadLeave() {
-  await populateLeaveOwnerDropdowns();
-  const [lRes, bRes] = await Promise.all([
-    db.from('leaves').select('*').order('date_from', { ascending: true }),
-    db.from('leave_balance').select('*')
-  ]);
-  allLeaves       = lRes.data || [];
-  allLeaveBalance = bRes.data || [];
-  renderLeave();
-  renderLeaveCalStrip();
-  renderLeaveBalance();
+  try {
+    await populateLeaveOwnerDropdowns();
+    const [lRes, bRes] = await Promise.all([
+      db.from('leaves').select('*').order('date_from', { ascending: true }),
+      db.from('leave_balance').select('*')
+    ]);
+    if (lRes.error) throw lRes.error;
+    if (bRes.error) throw bRes.error;
+    allLeaves       = lRes.data || [];
+    allLeaveBalance = bRes.data || [];
+    renderLeave();
+    renderLeaveCalStrip();
+    renderLeaveBalance();
+  } catch (error) {
+    logDbError('loadLeave', error);
+    showInlineError('leaveList', 'ໂຫຼດລາພັກບໍ່ສຳເລັດ', error);
+    showInlineError('leaveCalStrip', 'ໂຫຼດປະຕິທິນລາພັກບໍ່ສຳເລັດ', error);
+    showInlineError('leaveBalanceArea', 'ໂຫຼດວັນລາຄົງເຫຼືອບໍ່ສຳເລັດ', error);
+  }
 }
 
 
@@ -3131,11 +3211,21 @@ async function saveBalance() {
 
 // ════ REPORT ════
 async function loadReport() {
-  const [tRes, dRes] = await Promise.all([
-    db.from('tasks').select('*').order('created_at'),
-    db.from('documents').select('*'),
-  ]);
-  const t = tRes.data||[], d = dRes.data||[];
+  let t = [], d = [];
+  try {
+    const [tRes, dRes] = await Promise.all([
+      db.from('tasks').select('*').order('created_at'),
+      db.from('documents').select('*'),
+    ]);
+    if (tRes.error) throw tRes.error;
+    if (dRes.error) throw dRes.error;
+    t = tRes.data||[];
+    d = dRes.data||[];
+  } catch (error) {
+    logDbError('loadReport', error);
+    showMultiError(['kpiOverdue','kpiPendingDocs','kpiCompletion','statusChart','reportSummary'], 'ໂຫຼດລາຍງານບໍ່ສຳເລັດ', error);
+    return;
+  }
 
   // ── Base counts ──────────────────────────────────
   const done = t.filter(x=>x.status==='done').length;
