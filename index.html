@@ -373,6 +373,90 @@ body{font-size:16.5px;line-height:1.65;-webkit-font-smoothing:antialiased;text-r
   .form-row input,.form-row select,.form-row textarea{font-size:16px;}
 }
 
+
+
+/* ===== UX REFACTOR V18: stable proportions, controlled scrolling, production toasts ===== */
+html, body { height: 100%; overflow-x: hidden; }
+body { font-size: 16px; line-height: 1.55; }
+.modern-shell, .layout-shell, .app-shell, #mainApp {
+  min-height: 100vh;
+}
+.sidebar, .side-nav, .modern-sidebar {
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.topbar, .modern-topbar, .app-topbar, .sticky-header {
+  position: sticky !important;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+}
+.main-content, .content, .page-content, .app-main {
+  min-width: 0;
+  overflow: visible !important;
+}
+.card, .metric, .profile-card, .modern-card {
+  overflow: visible;
+}
+.activity-list, #profileActivityList, .table-wrap, .scroll-panel {
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+.table-wrap, .data-table-wrap { overflow-x: auto; }
+.metrics, .kpi-grid, .dashboard-grid {
+  align-items: stretch;
+}
+.btn-primary, .btn-outline, button {
+  min-height: 36px;
+}
+.form-row input, .form-row select, .form-row textarea {
+  font-size: 15px;
+}
+.empty, .empty-state {
+  padding: 24px 16px;
+  border-radius: 14px;
+  background: rgba(148,163,184,.10);
+  color: var(--muted, #64748b);
+}
+#toast, .toast {
+  z-index: 9999;
+}
+.toast-stack-v18 {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 99999;
+}
+.toast-v18 {
+  max-width: 360px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #fff;
+  background: #111827;
+  box-shadow: 0 14px 36px rgba(15,23,42,.22);
+  font-size: 14px;
+  animation: toastInV18 .22s ease-out;
+}
+.toast-v18.success { background: #047857; }
+.toast-v18.error { background: #b91c1c; }
+.toast-v18.warn { background: #b45309; }
+@keyframes toastInV18 { from { opacity: 0; transform: translateY(10px);} to { opacity: 1; transform: translateY(0);} }
+@media (max-width: 760px) {
+  body { font-size: 15px; }
+  .sidebar, .side-nav, .modern-sidebar { height: auto; max-height: none; position: relative !important; }
+  .activity-list, #profileActivityList, .table-wrap, .scroll-panel { max-height: 360px; }
+  .toast-stack-v18 { left: 12px; right: 12px; bottom: 12px; }
+  .toast-v18 { max-width: none; }
+}
+
 </style>
 </head>
 <body>
@@ -3923,5 +4007,39 @@ async function loadReport() {
 
 initApp();
 </script>
+
+
+<script>
+/* ===== UX REFACTOR V18: non-blocking toast instead of popup alert ===== */
+(function(){
+  function ensureToastStack(){
+    let stack = document.querySelector('.toast-stack-v18');
+    if(!stack){
+      stack = document.createElement('div');
+      stack.className = 'toast-stack-v18';
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
+  window.showToast = window.showToast || function(message, type='info'){
+    const stack = ensureToastStack();
+    const el = document.createElement('div');
+    el.className = 'toast-v18 ' + (type || 'info');
+    el.textContent = String(message || 'ດຳເນີນການແລ້ວ');
+    stack.appendChild(el);
+    setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(8px)'; }, 2600);
+    setTimeout(()=>{ el.remove(); }, 3100);
+  };
+  const nativeAlert = window.alert;
+  window.alert = function(message){
+    const text = String(message || '');
+    const lower = text.toLowerCase();
+    const type = lower.includes('error') || lower.includes('ຜິດ') || lower.includes('email') ? 'error' : 'info';
+    window.showToast(text, type);
+  };
+  window.__nativeAlert = nativeAlert;
+})();
+</script>
+
 </body>
 </html>
