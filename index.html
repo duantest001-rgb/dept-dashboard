@@ -4041,5 +4041,111 @@ initApp();
 })();
 </script>
 
+
+
+<!-- ===== V19 HOTFIX: Enterprise desktop layout - sidebar must not overlay content ===== -->
+<style id="layout-proportion-fix-v19">
+@media (min-width: 901px){
+  html, body{
+    height: 100%;
+    overflow-x: hidden !important;
+  }
+
+  /* Main app reserves real space for the sidebar */
+  #mainApp.app{
+    max-width: none !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+    margin: 0 !important;
+    padding: 24px 32px 56px 324px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+  }
+
+  /* Sidebar stays on the left and never covers content */
+  #mainApp .sticky-header{
+    position: fixed !important;
+    left: 22px !important;
+    top: 22px !important;
+    bottom: 22px !important;
+    width: 270px !important;
+    height: auto !important;
+    max-height: calc(100vh - 44px) !important;
+    margin: 0 !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+    z-index: 20 !important;
+  }
+
+  /* Content must start after the sidebar */
+  #mainApp > div[style*="padding-top"]{
+    padding-top: 0 !important;
+    max-width: 1420px !important;
+    width: 100% !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  #mainApp .page{
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Better dashboard proportions */
+  #mainApp .metrics{
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(170px, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  #mainApp .row2{
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) !important;
+    gap: 18px !important;
+    align-items: start !important;
+  }
+
+  #mainApp .card{
+    max-width: none !important;
+  }
+
+  /* Only long feeds/tables scroll inside, not the whole layout components */
+  #profileActivityList,
+  #activityList,
+  .activity-list,
+  .table-wrap,
+  .data-table-wrap{
+    max-height: 430px !important;
+    overflow-y: auto !important;
+  }
+
+  /* Avoid accidental global sticky topbar overriding sidebar behavior */
+  #mainApp .topbar{
+    position: static !important;
+  }
+}
+
+@media (max-width: 900px){
+  #mainApp.app{
+    padding: 12px 12px 42px !important;
+  }
+  #mainApp .sticky-header{
+    position: sticky !important;
+    top: 0 !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: auto !important;
+    max-height: 78vh !important;
+    margin: -12px -12px 14px !important;
+    border-radius: 0 0 24px 24px !important;
+    z-index: 30 !important;
+  }
+  #mainApp > div[style*="padding-top"]{
+    max-width: 100% !important;
+  }
+}
+</style>
+
 </body>
 </html>
