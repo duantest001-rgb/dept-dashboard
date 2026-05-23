@@ -2089,7 +2089,7 @@ async function loadProfileDashboard() {
       db.from('meetings').select('*').order('meet_date', { ascending:true }),
       db.from('leaves').select('*').order('date_from', { ascending:false }),
       db.from('leave_balance').select('*').eq('owner', email).maybeSingle(),
-      db.from('activity_log').select('*').eq('user_email', email).order('created_at', { ascending:false }).limit(8)
+      db.from('activity_log').select('*').order('created_at', { ascending:false }).limit(200)
     ]);
 
     const firstErr = tasksRes.error || docsRes.error || meetsRes.error || leavesRes.error || balRes.error || logRes.error;
@@ -2104,7 +2104,12 @@ async function loadProfileDashboard() {
     });
     const balance = balRes.data || null;
     const remainingLeave = calcLeaveRemaining(balance);
-    const myLogs = logRes.data || [];
+    const myLogs = (logRes.data || []).filter(l => {
+      const logEmail = String(l.user_email || '').toLowerCase().trim();
+      const logUserId = String(l.user_id || '').trim();
+      const profileId = String(currentProfile?.id || '').trim();
+      return logEmail === email.toLowerCase() || (profileId && logUserId === profileId);
+    }).slice(0, 8);
 
     const openTasks = myTasks.filter(t => t.status !== 'done').length;
     const urgentTasks = myTasks.filter(t => t.priority === 'urgent' && t.status !== 'done').length;
@@ -2145,7 +2150,7 @@ async function loadProfileDashboard() {
     $('profileActivity').innerHTML = renderProfileMiniList(
       myLogs,
       'ຍັງບໍ່ມີ Activity',
-      l => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(l.action || '-')} ${h(l.target_name || '')}</div><div class="profile-item-meta">${new Date(l.created_at).toLocaleString('lo-LA')} · ${h(l.target_type || '')}</div></div><i class="ti ti-chevron-right" style="color:var(--muted)"></i></div>`
+      l => `<div class="profile-mini-item"><div style="min-width:0"><div class="profile-item-title">${h(l.action || '-')} ${h(l.target_name || '')}</div><div class="profile-item-meta">${h(l.detail || '')}</div><div class="profile-item-meta">${new Date(l.created_at).toLocaleString('lo-LA')} · ${h(l.target_type || '')}</div></div><i class="ti ti-history" style="color:var(--muted)"></i></div>`
     );
   } catch (error) {
     logDbError('loadProfileDashboard', error);
