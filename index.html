@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard ພະແນກພັດທະນາທຸລະກິດ</title>
-<!-- Patch v2: Query/RLS Sync - store owner/created_by as email and let RLS filter reads -->
+<!-- Patch v3: UI Permission Cleanup - frontend buttons/forms follow profiles.role and RLS -->
 <!-- GitHub-ready single-file app. Use Supabase RLS before real deployment. -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.x/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -292,7 +292,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <span style="font-size:13px;color:var(--muted)">ທັງໝົດ <strong id="taskCount" style="color:var(--text)">—</strong> ລາຍການ</span>
       <div style="display:flex;gap:6px">
         <button class="btn-outline" onclick="exportXLSX()" style="font-size:12px"><i class="ti ti-download"></i> Excel</button>
-        <button class="btn-outline" onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
+        <button class="btn-outline" data-write-action onclick="toggleForm('addTaskForm')"><i class="ti ti-plus"></i> ເພີ່ມວຽກ</button>
       </div>
     </div>
     <div class="search-panel">
@@ -389,7 +389,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
       <div class="form-row"><label>ໝາຍເຫດ / ບັນຫາ</label><textarea id="eNotes" placeholder="ລາຍລະອຽດ..."></textarea></div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="saveEditTask()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-primary" data-write-action onclick="saveEditTask()">💾 ບັນທຶກການແກ້ໄຂ</button>
         <button class="btn-outline" onclick="document.getElementById('editTaskForm').style.display='none'">ຍົກເລີກ</button>
       </div>
     </div>
@@ -404,7 +404,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   <div class="page" id="page-docs">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ຕິດຕາມເສັ້ນທາງເອກະສານ</span>
-      <button class="btn-outline" onclick="toggleForm('addDocForm')"><i class="ti ti-plus"></i> ເພີ່ມເອກະສານ</button>
+      <button class="btn-outline" data-write-action onclick="toggleForm('addDocForm')"><i class="ti ti-plus"></i> ເພີ່ມເອກະສານ</button>
     </div>
     <div class="search-panel">
       <div style="position:relative">
@@ -508,7 +508,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div class="form-row"><label>ສ່ົງຫາ</label><input type="text" id="eDTo" placeholder="ຊື່ຜູ້ຮັບ..."></div>
       <div class="form-row"><label>ຂັ້ນຕອນ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eDSteps" placeholder="ສ້າງ,ກວດ,ໜ.ພ.,CFO,ອະນຸມັດ"></div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="saveEditDoc()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-primary" data-write-action onclick="saveEditDoc()">💾 ບັນທຶກການແກ້ໄຂ</button>
         <button class="btn-outline" onclick="document.getElementById('editDocForm').style.display='none'">ຍົກເລີກ</button>
       </div>
     </div>
@@ -518,7 +518,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
   <div class="page" id="page-meet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <span style="font-size:13px;color:var(--muted)">ຕາຕະລາງນັດໝາຍ & ກອງປະຊຸມ</span>
-      <button class="btn-outline" onclick="toggleForm('addMeetForm')"><i class="ti ti-plus"></i> ນັດໃໝ່</button>
+      <button class="btn-outline" data-manager-only onclick="toggleForm('addMeetForm')"><i class="ti ti-plus"></i> ນັດໃໝ່</button>
     </div>
     <div class="search-panel">
       <div style="position:relative">
@@ -607,7 +607,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ (ຄັ່ນດ້ວຍ , )</label><input type="text" id="eMAtt" placeholder="ສສ,ບທ,ມລ..."></div>
       <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="eMNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="saveEditMeet()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-primary" data-manager-only onclick="saveEditMeet()">💾 ບັນທຶກການແກ້ໄຂ</button>
         <button class="btn-outline" onclick="document.getElementById('editMeetForm').style.display='none'">ຍົກເລີກ</button>
       </div>
     </div>
@@ -633,7 +633,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
           <option value="overtime">⚡ ຄອບລ່ວງໜ້າ</option>
           <option value="other">📝 ອື່ນໆ</option>
         </select>
-        <button class="btn-outline" onclick="toggleForm('addLeaveForm')"><i class="ti ti-plus"></i> ຂໍລາ/ຄອບ</button>
+        <button class="btn-outline" data-write-action onclick="toggleForm('addLeaveForm')"><i class="ti ti-plus"></i> ຂໍລາ/ຄອບ</button>
       </div>
     </div>
 
@@ -641,7 +641,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
     <div class="card" style="margin-bottom:10px">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         <span><i class="ti ti-wallet" style="color:var(--c1)"></i> ວັນລາຄົງເຫຼືອ (ປີນີ້)</span>
-        <button onclick="openBalanceModal()" style="font-size:11px;padding:4px 10px;border:1px solid var(--c2);color:var(--c2m);background:var(--c2l);border-radius:6px;cursor:pointer"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
+        <button data-manager-only onclick="openBalanceModal()" style="font-size:11px;padding:4px 10px;border:1px solid var(--c2);color:var(--c2m);background:var(--c2l);border-radius:6px;cursor:pointer"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
       </div>
       <div id="leaveBalanceArea"><div class="spinner">ໂຫຼດ...</div></div>
     </div>
@@ -739,7 +739,7 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
       <div class="form-row"><label>ເຫດຜົນ</label><textarea id="eLReason" placeholder="ລາຍລະອຽດ..."></textarea></div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="saveEditLeave()">💾 ບັນທຶກການແກ້ໄຂ</button>
+        <button class="btn-primary" data-write-action onclick="saveEditLeave()">💾 ບັນທຶກການແກ້ໄຂ</button>
         <button class="btn-outline" onclick="document.getElementById('editLeaveForm').style.display='none'">ຍົກເລີກ</button>
       </div>
     </div>
@@ -1091,30 +1091,57 @@ async function loadUserProfile() {
   }
 }
 
+function setVisible(el, visible, fallbackDisplay = '') {
+  if (!el) return;
+  if (el.dataset.defaultDisplay === undefined) {
+    el.dataset.defaultDisplay = el.style.display || fallbackDisplay;
+  }
+  el.style.display = visible ? (el.dataset.defaultDisplay || fallbackDisplay || '') : 'none';
+}
+
 function applyPermissionUI() {
-  const adminBtn = $('adminNavBtn');
-  if (adminBtn) adminBtn.style.display = hasRole('admin') ? 'inline-block' : 'none';
+  const role = currentRole || 'viewer';
+  const isViewer = role === 'viewer';
+  const superior = hasRole('admin','manager');
 
-  const addAnnBtn = $('addAnnBtn');
-  if (addAnnBtn) addAnnBtn.style.display = hasRole('admin','manager') ? 'inline-block' : 'none';
+  // ===== NAV / MAIN ACTIONS =====
+  setVisible($('adminNavBtn'), hasRole('admin'), 'inline-block');
+  setVisible($('addAnnBtn'), superior, 'inline-block');
 
+  // ===== ATTRIBUTE-BASED PERMISSIONS =====
   document.querySelectorAll('[data-admin-only]').forEach(el => {
-    el.style.display = hasRole('admin') ? '' : 'none';
+    setVisible(el, hasRole('admin'));
   });
 
   document.querySelectorAll('[data-manager-only]').forEach(el => {
-    el.style.display = hasRole('admin','manager') ? '' : 'none';
+    setVisible(el, superior);
   });
 
   document.querySelectorAll('[data-employee-only]').forEach(el => {
-    el.style.display = hasRole('employee') ? '' : 'none';
+    setVisible(el, hasRole('employee'));
   });
 
-  document.querySelectorAll('.btn-add,.btn-edit,.btn-delete,[data-write-action]').forEach(el => {
-    if (hasRole('viewer')) el.style.display = 'none';
+  // Generic write actions: admin/manager/employee can write, viewer read-only.
+  document.querySelectorAll('[data-write-action], .btn-add, .btn-edit, .btn-delete').forEach(el => {
+    setVisible(el, !isViewer);
   });
+
+  // Disable forms for viewer if a form is already open.
+  document.querySelectorAll('#mainApp input, #mainApp select, #mainApp textarea, #mainApp button').forEach(el => {
+    if (el.closest('.nav') || el.id === 'userEmail') return;
+    if (isViewer && (el.matches('[data-write-action], .btn-primary') || el.closest('form'))) {
+      el.disabled = true;
+    } else if (!isViewer && el.dataset.forceDisabled !== 'true') {
+      el.disabled = false;
+    }
+  });
+
+  console.log('Permission UI Applied:', role);
 }
 
+function canWrite()   { return !hasRole('viewer'); }
+function canManageMeetings() { return isSuperior(); }
+function canManageLeaveBalance() { return isSuperior(); }
 function canAdmin()   { return hasRole('admin'); }
 function isSuperior() { return hasRole('admin','manager'); }
 
@@ -1848,7 +1875,7 @@ async function loadDash() {
           <span>ໂດຍ ${a.author} · ${new Date(a.created_at).toLocaleDateString('lo-LA')}</span>
         </div>
       </div>
-      ${canManageAnn()?`<button onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
+      ${canManageAnn()?`<button class="btn-delete" data-manager-only onclick="deleteAnnouncement(${a.id})" style="flex-shrink:0;margin-left:10px;border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i></button>`:''}
     </div>`).join('');
 }
 
@@ -1894,7 +1921,7 @@ function renderTasks() {
       const rowBg = t.status!=='done' && due.tag.includes('ຊ້າ') ? 'background:var(--c4l);' : t.status!=='done' && due.tag.includes('ໝົດ') ? 'background:var(--c4l);' : t.status!=='done' && due.tag.includes('ອີກ') ? 'background:var(--c3l);' : '';
       return `
       <div class="task-item" id="ti-${t.id}" style="${rowBg}">
-        <div class="task-check ${t.status==='done'?'done':''}" onclick="toggleDone(${t.id},'${t.status}')">${t.status==='done'?'✓':''}</div>
+        <div class="task-check ${t.status==='done'?'done':''}" ${canEditTask(t)?`onclick="toggleDone(${t.id},'${t.status}')"`:'style="opacity:.45;cursor:not-allowed" title="ບໍ່ມີສິດແກ້ໄຂ"'}>${t.status==='done'?'✓':''}</div>
         <div class="task-info">
           <div class="task-name ${t.status==='done'?'done':''}">${h(t.name)}</div>
           <div class="task-meta">
@@ -1911,9 +1938,9 @@ function renderTasks() {
         <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">
           <span style="font-size:12px;font-weight:600;color:var(--muted)">${t.progress}%</span>
           <div style="display:flex;gap:4px">
-            ${canEditTask(t)?`<button onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>`:''}
-            ${canDeleteTask()?`<button onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>`:''}
-            ${canCommentTask(t)?`<button onclick="toggleComments(${t.id})" style="border:1px solid var(--border);background:#eeedfe;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#534AB7" title="Comment"><i class="ti ti-message"></i></button>`:'<button disabled style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--muted);cursor:not-allowed" title="ເບິ່ງໄດ້ຢ່າງດຽວ"><i class="ti ti-lock"></i></button>'}
+            ${canEditTask(t)?`<button class="btn-edit" data-write-action onclick="openEditTask(${t.id})" style="border:1px solid var(--border);background:#e6f1fb;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#185FA5" title="ແກ້ໄຂ"><i class="ti ti-edit"></i></button>`:''}
+            ${canDeleteTask()?`<button class="btn-delete" data-manager-only onclick="deleteTask(${t.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#993C1D" title="ລຶບ"><i class="ti ti-trash"></i></button>`:''}
+            ${canCommentTask(t)?`<button data-write-action onclick="toggleComments(${t.id})" style="border:1px solid var(--border);background:#eeedfe;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:12px;color:#534AB7" title="Comment"><i class="ti ti-message"></i></button>`:'<button disabled style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--muted);cursor:not-allowed" title="ເບິ່ງໄດ້ຢ່າງດຽວ"><i class="ti ti-lock"></i></button>'}
           </div>
         </div>
       </div>
@@ -1965,7 +1992,7 @@ function renderTasks() {
           <textarea id="comment-input-${t.id}" placeholder="ຂຽນ update, ຂໍ້ຕິດຂັດ, ຫຼື ໝາຍເຫດ..."
             rows="2" style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical"></textarea>
           <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
-            <button onclick="toggleComments(${t.id})" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit">ຍົກເລີກ</button>
+            <button data-write-action onclick="toggleComments(${t.id})" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);background:transparent;border-radius:var(--radius);cursor:pointer;color:var(--muted);font-family:inherit">ຍົກເລີກ</button>
             <button onclick="submitUpdate(${t.id})" style="font-size:12px;padding:5px 14px;border:none;background:var(--c1);color:#fff;border-radius:var(--radius);cursor:pointer;font-family:inherit;font-weight:600">💾 ບັນທຶກ update</button>
           </div>
         </div>
@@ -1998,6 +2025,8 @@ function openEditTask(id) {
 }
 
 async function saveEditTask() {
+  const task = allTasks.find(t => t.id == document.getElementById('editTaskId').value);
+  if (!canEditTask(task)) return toast('⛔ ບໍ່ມີສິດແກ້ໄຂວຽກນີ້');
   const id = parseInt(document.getElementById('editTaskId').value);
   const n = document.getElementById('eName').value.trim();
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກ');return;}
@@ -2046,6 +2075,8 @@ function setFilter(f, btn) {
 }
 
 async function toggleDone(id, status) {
+  const task = allTasks.find(t => t.id == id);
+  if (!canEditTask(task)) return toast('⛔ ບໍ່ມີສິດແກ້ໄຂວຽກນີ້');
   const newStatus = status==='done' ? 'inprogress' : 'done';
   const newProg   = newStatus==='done' ? 100 : 80;
   await db.from('tasks').update({status:newStatus, progress:newProg}).eq('id',id);
@@ -2056,6 +2087,7 @@ async function toggleDone(id, status) {
 }
 
 async function saveTask() {
+  if (!canWrite()) return toast('⛔ Viewer ເບິ່ງໄດ້ຢ່າງດຽວ');
   const n = document.getElementById('tName').value.trim();
   if(!n){toast('⚠️ ໃສ່ຊື່ວຽກດ້ວຍ');return;}
   const btn = document.getElementById('saveTaskBtn');
@@ -2160,17 +2192,17 @@ function renderDocs() {
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <button onclick="openDocHistory(${d.id})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)"><i class="ti ti-history"></i> History</button>
             ${!isDone && !isCancelled && isSuperior()
-              ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
+              ? `<button class="btn-outline" data-manager-only style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">➡️ ຜ່ານຂັ້ນຕໍ່ໄປ</button>` : ''}
             ${!isCancelled && canAdmin() && d.current_step > 0
-              ? `<button onclick="revertDoc(${d.id},${d.current_step})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)" title="ຍ້ອນກັບຂັ້ນກ່ອນໜ້າ">◀ ຍ້ອນກັບ</button>` : ''}
+              ? `<button data-admin-only onclick="revertDoc(${d.id},${d.current_step})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)" title="ຍ້ອນກັບຂັ້ນກ່ອນໜ້າ">◀ ຍ້ອນກັບ</button>` : ''}
             ${!isCancelled && isSuperior()
-              ? `<button onclick="cancelDoc(${d.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-ban"></i> ຍົກເລີກ</button>` : ''}
+              ? `<button data-manager-only onclick="cancelDoc(${d.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-ban"></i> ຍົກເລີກ</button>` : ''}
             ${isCancelled && isSuperior()
-              ? `<button onclick="restoreDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
+              ? `<button data-manager-only onclick="restoreDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
             ${canEditDoc(d) && !isCancelled
-              ? `<button onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
+              ? `<button class="btn-edit" data-write-action onclick="openEditDoc(${d.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
             ${canDeleteDoc()
-              ? `<button onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
+              ? `<button class="btn-delete" data-manager-only onclick="deleteDoc(${d.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -2354,6 +2386,8 @@ function openEditDoc(id) {
 }
 
 async function saveEditDoc() {
+  const doc = allDocs.find(d => d.id == document.getElementById('editDocId').value);
+  if (!canEditDoc(doc)) return toast('⛔ ບໍ່ມີສິດແກ້ເອກະສານນີ້');
   const id = parseInt(document.getElementById('editDocId').value);
   const n  = document.getElementById('eDName').value.trim();
   if(!n){ toast('⚠️ ໃສ່ຊື່ເອກະສານ'); return; }
@@ -2409,6 +2443,7 @@ async function generateDocNumber() {
 }
 
 async function saveDoc() {
+  if (!canWrite()) return toast('⛔ Viewer ເບິ່ງໄດ້ຢ່າງດຽວ');
   const n = document.getElementById('dName').value.trim();
   if(!n){toast('⚠️ ໃສ່ຊື່ເອກະສານ');return;}
   const tp       = document.getElementById('dType').value.split(' ')[0];
@@ -2496,17 +2531,17 @@ function renderMeet() {
           <div class="attendees">${avatars}</div>
           <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
             ${!isDone && !isCancelled && !isPostponed && isSuperior()
-              ? `<button onclick="confirmMeet(${m.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ຢືນຢັນແລ້ວ</button>` : ''}
+              ? `<button data-manager-only onclick="confirmMeet(${m.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ຢືນຢັນແລ້ວ</button>` : ''}
             ${!isDone && !isCancelled && !isPostponed && isSuperior()
-              ? `<button onclick="openPostponeMeet(${m.id})" style="border:1px solid #FAC775;background:#FFF3CD;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#856404">⏩ ເລື່ອນ</button>` : ''}
+              ? `<button data-manager-only onclick="openPostponeMeet(${m.id})" style="border:1px solid #FAC775;background:#FFF3CD;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#856404">⏩ ເລື່ອນ</button>` : ''}
             ${!isDone && !isCancelled && !isPostponed && isSuperior()
-              ? `<button onclick="cancelMeet(${m.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">🚫 ຍົກເລີກ</button>` : ''}
+              ? `<button data-manager-only onclick="cancelMeet(${m.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">🚫 ຍົກເລີກ</button>` : ''}
             ${(isCancelled||isPostponed||isDone) && isSuperior()
-              ? `<button onclick="restoreMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
+              ? `<button data-manager-only onclick="restoreMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-refresh"></i> ຟື້ນຟູ</button>` : ''}
             ${canEdit() && !isCancelled
-              ? `<button onclick="openEditMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
+              ? `<button class="btn-edit" data-manager-only onclick="openEditMeet(${m.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>` : ''}
             ${canDelete()
-              ? `<button onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
+              ? `<button class="btn-delete" data-manager-only onclick="deleteMeet(${m.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -2530,6 +2565,7 @@ function openEditMeet(id) {
 }
 
 async function saveEditMeet() {
+  if (!canManageMeetings()) return toast('⛔ ສະເພາະ Admin/Manager ແກ້ນັດໝາຍໄດ້');
   const id = parseInt(document.getElementById('editMeetId').value);
   const t  = document.getElementById('eMTitle').value.trim();
   if(!t){ toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
@@ -2683,6 +2719,7 @@ function clearMeetSearch() {
 }
 
 async function saveMeet() {
+  if (!canManageMeetings()) return toast('⛔ ສະເພາະ Admin/Manager ເພີ່ມນັດໝາຍໄດ້');
   const t = document.getElementById('mTitle').value.trim();
   if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
   const rawAtt = document.getElementById('mAtt').value;
@@ -2838,14 +2875,14 @@ function renderLeave() {
         ${l.reason ? `<div style="font-size:12px;color:var(--text);margin-top:3px">💬 ${l.reason}</div>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
           ${isPending && isSuperior() ? `
-            <button onclick="approveLeave(${l.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ອະນຸມັດ</button>
-            <button onclick="rejectLeave(${l.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">❌ ປະຕິເສດ</button>
+            <button data-manager-only onclick="approveLeave(${l.id})" style="border:1px solid #9FE1CB;background:#E1F5EE;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#0F6E56;font-weight:500">✅ ອະນຸມັດ</button>
+            <button data-manager-only onclick="rejectLeave(${l.id})" style="border:1px solid #F5C4B3;background:#FDF5F3;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D">❌ ປະຕິເສດ</button>
           ` : ''}
           ${(isSuperior() || matchesMe(l.owner)) && l.status==='pending' ? `
-            <button onclick="openEditLeave(${l.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
+            <button class="btn-edit" data-write-action onclick="openEditLeave(${l.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
           ` : ''}
           ${isSuperior() ? `
-            <button onclick="deleteLeave(${l.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
+            <button class="btn-delete" data-manager-only onclick="deleteLeave(${l.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
           ` : ''}
         </div>
       </div>
@@ -2854,6 +2891,7 @@ function renderLeave() {
 }
 
 async function saveLeave() {
+  if (!canWrite()) return toast('⛔ Viewer ເບິ່ງໄດ້ຢ່າງດຽວ');
   const owner = normalizeUserRef(document.getElementById('lOwner').value, myEmail());
   const lType = document.getElementById('lType').value;
   const dFrom = document.getElementById('lFrom').value;
@@ -2897,6 +2935,8 @@ async function openEditLeave(id) {
 }
 
 async function saveEditLeave() {
+  const leave = allLeaves.find(l => l.id == document.getElementById('editLeaveId').value);
+  if (!(isSuperior() || (leave && matchesMe(leave.owner) && leave.status === 'pending'))) return toast('⛔ ບໍ່ມີສິດແກ້ໃບລານີ້');
   const id    = parseInt(document.getElementById('editLeaveId').value);
   const owner = normalizeUserRef(document.getElementById('eLOwner').value, myEmail());
   const lType = document.getElementById('eLType').value;
@@ -2918,6 +2958,7 @@ async function saveEditLeave() {
 }
 
 async function approveLeave(id) {
+  if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ອະນຸມັດໄດ້');
   const l = allLeaves.find(x=>x.id===id);
   const { error } = await db.from('leaves').update({ status:'approved' }).eq('id',id);
   if (error) { toast('❌ '+error.message); return; }
@@ -2927,6 +2968,7 @@ async function approveLeave(id) {
 }
 
 async function rejectLeave(id) {
+  if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ປະຕິເສດໄດ້');
   const l = allLeaves.find(x=>x.id===id);
   const { error } = await db.from('leaves').update({ status:'rejected' }).eq('id',id);
   if (error) { toast('❌ '+error.message); return; }
