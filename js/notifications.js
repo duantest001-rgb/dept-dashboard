@@ -198,14 +198,35 @@ function ensureToastStackV22(){
   return stack;
 }
 
-window.showToast = function(message, type='info'){
+const __toastSeenV26 = new Map();
+
+function toastKeyV26(message, type) {
+  return `${type || 'info'}:${String(message || '').trim()}`;
+}
+
+window.showToast = function(message, type='info', opts={}){
+  const text = String(message || 'ດຳເນີນການແລ້ວ').trim();
+  const key = opts.key || toastKeyV26(text, type);
+  const now = Date.now();
+  const cooldown = opts.cooldown || 4500;
+
+  // Prevent the same toast from stacking repeatedly.
+  if (__toastSeenV26.has(key) && now - __toastSeenV26.get(key) < cooldown) return;
+  __toastSeenV26.set(key, now);
+
   const stack = ensureToastStackV22();
+  [...stack.querySelectorAll('.toast-v22')].slice(0, -2).forEach(el => el.remove());
+
   const el = document.createElement('div');
   el.className = `toast-v22 ${type || 'info'}`;
-  el.textContent = String(message || 'ດຳເນີນການແລ້ວ');
+  el.textContent = text;
   stack.appendChild(el);
-  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(8px)'; }, 2800);
-  setTimeout(()=>{ el.remove(); }, 3300);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translateY(8px)'; }, opts.duration || 2800);
+  setTimeout(()=>{ el.remove(); }, (opts.duration || 2800) + 500);
+};
+
+window.toastOnce = function(key, message, type='info') {
+  window.showToast(message, type, { key, cooldown: 8000 });
 };
 
 window.toast = function(message, type='info') {

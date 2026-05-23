@@ -1,4 +1,4 @@
-function normalizeParticipants(value) {
+function normalizeParticipants(value, { notify=false } = {}) {
   let arr = [];
   if (Array.isArray(value)) arr = value;
   else if (typeof value === 'string') {
@@ -9,10 +9,20 @@ function normalizeParticipants(value) {
       arr = value.split(',');
     }
   }
-  return [...new Set(arr
-    .map(v => requireEmailRef(v, '', 'ຜູ້ເຂົ້າຮ່ວມ'))
-    .filter(Boolean)
-    .map(v => String(v).trim().toLowerCase()))];
+
+  const emails = [];
+  arr.forEach(v => {
+    const mapped = normalizeUserRef(v, '');
+    const email = String(mapped || '').trim().toLowerCase();
+    if (email && email.includes('@')) emails.push(email);
+  });
+
+  // Do not show toast while rendering/loading old records. Only save actions should warn.
+  if (notify && arr.length && emails.length === 0) {
+    toastOnce('participants-invalid', '⚠️ ກະລຸນາເລືອກຜູ້ເຂົ້າຮ່ວມເປັນ email ຈາກລາຍຊື່', 'warning');
+  }
+
+  return [...new Set(emails)];
 }
 
 function selectedParticipantEmails(selectId) {

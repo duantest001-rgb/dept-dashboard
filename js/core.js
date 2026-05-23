@@ -96,7 +96,7 @@ function requireEmailRef(value, fallbackEmail = myEmail(), fieldLabel = 'user') 
   const email = String(normalized || '').trim().toLowerCase();
   if (!email || email === '—' || !email.includes('@')) {
     debugError('Invalid user reference for save:', { fieldLabel, value, normalized, fallbackEmail });
-    toast(`⚠️ ${fieldLabel} ຕ້ອງເປັນ email ເຊັ່ນ pou@bd.com`);
+    toastOnce(`invalid-email-${fieldLabel}`, `⚠️ ${fieldLabel} ຕ້ອງເປັນ email ເຊັ່ນ pou@bd.com`, 'warning');
     return null;
   }
   return email;
