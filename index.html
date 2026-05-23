@@ -978,53 +978,133 @@ function requireDbReady() {
 }
 
 
-// ── ROLE helpers ─────────────────────────────────
+// ── ROLE / PROFILE / PERMISSION helpers ─────────────────────────────────
 let currentUser = null;
-let currentRole = 'employee';
+let currentProfile = null;
+let currentRole = 'viewer';
+
+const ROLE_LABELS = {
+  admin: 'Admin',
+  manager: 'ຫົວໜ້າ',
+  employee: 'ພະນັກງານ',
+  viewer: 'Viewer'
+};
+
+function normalizeRole(role) {
+  const r = String(role || 'viewer').trim().toLowerCase();
+  return ['admin','manager','employee','viewer'].includes(r) ? r : 'viewer';
+}
+
+function formatRoleLabel(role) {
+  return ROLE_LABELS[normalizeRole(role)] || role || 'Viewer';
+}
+
+function hasRole(...roles) {
+  return roles.includes(currentRole);
+}
+
+function myEmail() {
+  return (currentUser?.email || currentProfile?.email || '').trim().toLowerCase();
+}
+
+// Backward-compatible name: now returns full email, not prefix.
+function myEmailPrefix() {
+  return myEmail();
+}
+
+function myEmailKey() {
+  return myEmail().split('@')[0] || '';
+}
+
+function matchesMe(value) {
+  const v = String(value || '').trim().toLowerCase();
+  return !!v && (v === myEmail() || v === myEmailKey());
+}
 
 async function loadUserProfile() {
   try {
-    currentRole = 'employee';
+    currentRole = 'viewer';
     currentUser = null;
-    const adminBtn = $('adminNavBtn');
-    if (adminBtn) adminBtn.style.display = 'none';
+    currentProfile = null;
 
     const { data: { user }, error: userError } = await db.auth.getUser();
     if (userError) throw userError;
     if (!user) return null;
+
     currentUser = user;
 
-    const { data, error } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
+    const { data: profile, error } = await db
+      .from('profiles')
+      .select('id,email,full_name,role')
+      .eq('id', user.id)
+      .maybeSingle();
+
     if (error) throw error;
 
-    if (data?.role) currentRole = data.role;
-    const roleName = {admin:'Admin',manager:'ຫົວໜ້າ',employee:'ພະນັກງານ',viewer:'Viewer'}[currentRole] || currentRole;
+    currentProfile = profile || {
+      id: user.id,
+      email: user.email,
+      full_name: '',
+      role: 'viewer'
+    };
+
+    currentRole = normalizeRole(currentProfile.role);
+
     const userEmailEl = $('userEmail');
-    if (userEmailEl) userEmailEl.textContent = `${user.email} (${roleName})`;
-    if (currentRole === 'admin' && adminBtn) adminBtn.style.display = 'inline-block';
-    return data;
+    if (userEmailEl) {
+      const label = formatRoleLabel(currentRole);
+      userEmailEl.textContent = `${currentProfile.email || user.email} (${label})`;
+      userEmailEl.dataset.role = currentRole;
+    }
+
+    applyPermissionUI();
+    console.log('Profile loaded:', currentProfile.email, currentRole);
+    return currentProfile;
   } catch (err) {
     console.error('loadUserProfile failed:', err);
-    toast('⚠️ ໂຫຼດ Profile ບໍ່ສຳເລັດ');
+    toast('⚠️ ໂຫຼດ Profile/Role ບໍ່ສຳເລັດ');
     return null;
   }
 }
 
-function canAdmin()   { return currentRole === 'admin'; }
-function isSuperior() { return ['admin','manager'].includes(currentRole); }
-function myEmailPrefix() { return currentUser ? (currentUser.email||'').split('@')[0] : ''; }
+function applyPermissionUI() {
+  const adminBtn = $('adminNavBtn');
+  if (adminBtn) adminBtn.style.display = hasRole('admin') ? 'inline-block' : 'none';
+
+  const addAnnBtn = $('addAnnBtn');
+  if (addAnnBtn) addAnnBtn.style.display = hasRole('admin','manager') ? 'inline-block' : 'none';
+
+  document.querySelectorAll('[data-admin-only]').forEach(el => {
+    el.style.display = hasRole('admin') ? '' : 'none';
+  });
+
+  document.querySelectorAll('[data-manager-only]').forEach(el => {
+    el.style.display = hasRole('admin','manager') ? '' : 'none';
+  });
+
+  document.querySelectorAll('[data-employee-only]').forEach(el => {
+    el.style.display = hasRole('employee') ? '' : 'none';
+  });
+
+  document.querySelectorAll('.btn-add,.btn-edit,.btn-delete,[data-write-action]').forEach(el => {
+    if (hasRole('viewer')) el.style.display = 'none';
+  });
+}
+
+function canAdmin()   { return hasRole('admin'); }
+function isSuperior() { return hasRole('admin','manager'); }
 
 // Tasks
-function canEditTask(task)   { return isSuperior() || myEmailPrefix() === (task.owner||''); }
+function canEditTask(task)   { return isSuperior() || matchesMe(task?.owner); }
 function canDeleteTask()     { return isSuperior(); }
-function canCommentTask(task){ return isSuperior() || myEmailPrefix() === (task.owner||''); }
+function canCommentTask(task){ return isSuperior() || matchesMe(task?.owner); }
 
 // Docs
-function canEditDoc(doc)   { return isSuperior() || myEmailPrefix() === (doc.created_by||''); }
+function canEditDoc(doc)   { return isSuperior() || matchesMe(doc?.created_by); }
 function canDeleteDoc()    { return isSuperior(); }
 
 // Announcements
-function canManageAnn()  { return canAdmin(); }
+function canManageAnn()  { return hasRole('admin','manager'); }
 
 // ack/fixed: superior ຫຼື ຄົນທີ່ບໍ່ແມ່ນເຈົ້າຂອງ comment
 function canAckComment(comment) { return isSuperior() || (currentUser && comment.user_id !== currentUser.id); }
@@ -1051,7 +1131,7 @@ async function loadLog() {
     opts.forEach(o => {
       const opt = document.createElement('option');
       opt.value = o.email;
-      opt.textContent = o.value + (o.value === myEmailPrefix() ? ' (ທ່ານ)' : '');
+      opt.textContent = o.label + (o.value === myEmail() ? ' (ທ່ານ)' : '');
       userSel.appendChild(opt);
     });
   }
@@ -1470,10 +1550,13 @@ async function checkSession() {
 async function showApp(email) {
   $('loginPage').style.display = 'none';
   $('mainApp').style.display = 'block';
-  $('userEmail').textContent = email;
+  $('userEmail').textContent = email || '';
+
   await loadUserProfile();
+  applyPermissionUI();
+
   $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  await Promise.allSettled([loadUserOptions(), loadDash()]);
+  await Promise.allSettled([loadUserOptions(true), loadDash()]);
 }
 
 function showLogin() {
@@ -1543,14 +1626,22 @@ function showPage(p, btn) {
 // ════ USER OPTIONS (for dropdowns) ════
 let cachedUserOptions = null;
 
-async function loadUserOptions() {
-  if (cachedUserOptions) return cachedUserOptions;
-  const { data } = await db.from('profiles').select('id, email, role').order('email');
-  cachedUserOptions = (data || []).map(u => ({
-    value: (u.email||'').split('@')[0],
-    label: (u.email||'').split('@')[0],
-    email: u.email
-  }));
+async function loadUserOptions(forceRefresh=false) {
+  if (cachedUserOptions && !forceRefresh) return cachedUserOptions;
+  const { data, error } = await db.from('profiles').select('id, email, full_name, role').order('email');
+  if (error) {
+    console.error('loadUserOptions failed:', error);
+    cachedUserOptions = [];
+    return cachedUserOptions;
+  }
+  cachedUserOptions = (data || [])
+    .filter(u => !!u.email)
+    .map(u => ({
+      value: String(u.email).trim().toLowerCase(),
+      label: u.full_name ? `${u.full_name} (${u.email})` : String(u.email).trim().toLowerCase(),
+      email: String(u.email).trim().toLowerCase(),
+      role: normalizeRole(u.role)
+    }));
   return cachedUserOptions;
 }
 
@@ -1558,12 +1649,14 @@ async function populateUserSelect(selectId, currentVal, lockToSelf) {
   const opts = await loadUserOptions();
   const sel  = document.getElementById(selectId);
   if (!sel) return;
-  const me = myEmailPrefix();
+  const me = myEmail();
+  const selectedVal = String(currentVal || me || '').trim().toLowerCase();
   sel.innerHTML = opts.length === 0
-    ? `<option value="${me}">${me} (ທ່ານ)</option>`
-    : opts.map(o => `<option value="${o.value}" ${o.value === (currentVal||me) ? 'selected' : ''}>
-        ${o.value}${o.value === me ? ' (ທ່ານ)' : ''}
+    ? `<option value="${h(me)}">${h(me)} (ທ່ານ)</option>`
+    : opts.map(o => `<option value="${h(o.value)}" ${o.value === selectedVal ? 'selected' : ''}>
+        ${h(o.label)}${o.value === me ? ' (ທ່ານ)' : ''}
       </option>`).join('');
+  if (lockToSelf && me) sel.value = me;
   sel.disabled = lockToSelf;
   sel.style.background = lockToSelf ? 'var(--bg2)' : '';
   sel.title = lockToSelf ? 'ຕື່ມໂດຍ account ຂອງທ່ານ' : 'ສາມາດ assign ໃຫ້ຄົນອື່ນໄດ້';
