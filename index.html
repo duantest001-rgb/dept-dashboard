@@ -151,6 +151,21 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
 /* ── Toast ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:20px;font-size:13px;opacity:0;transition:all .3s;z-index:999;pointer-events:none}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+
+/* ── Participant icon picker ── */
+.participant-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-top:4px}
+.participant-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);background:var(--card);border-radius:999px;cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;color:var(--text)}
+.participant-chip:hover{background:var(--c2l);border-color:var(--c2)}
+.participant-chip.selected{background:var(--c1l);border-color:var(--c1);box-shadow:0 0 0 2px rgba(29,158,117,.12)}
+.participant-chip .p-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--c2l);color:var(--c2m);flex-shrink:0}
+.participant-chip.selected .p-avatar{background:var(--c1);color:#fff}
+.participant-chip .p-main{min-width:0;flex:1}
+.participant-chip .p-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.participant-chip .p-email{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.participant-chip .p-check{font-size:14px;color:var(--c1);width:16px;text-align:center}
+.participant-summary{font-size:11px;color:var(--muted);margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -582,8 +597,9 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
       <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="mLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
       <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ</label>
-          <select id="mAtt" multiple size="4" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%"></select>
-          <small style="font-size:11px;color:var(--muted)">ເລືອກໄດ້ຫຼາຍຄົນ — ລະບົບຈະບັນທຶກເປັນ email ເຊັ່ນ pou@bd.com</small>
+          <select id="mAtt" multiple style="display:none"></select>
+          <div id="mAttPicker" class="participant-picker"></div>
+          <div id="mAttSummary" class="participant-summary">ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ</div>
         </div>
       <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="mNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
       <div class="btn-row">
@@ -611,8 +627,9 @@ body{font-family:'Noto Sans Lao','Phetsarath OT',system-ui,sans-serif;background
       </div>
       <div class="form-row"><label>ສະຖານທີ / Link</label><input type="text" id="eMLoc" placeholder="ຫ້ອງ A / Google Meet..."></div>
       <div class="form-row"><label>ຜູ້ເຂົ້າຮ່ວມ</label>
-          <select id="eMAtt" multiple size="4" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%"></select>
-          <small style="font-size:11px;color:var(--muted)">ເກັບເປັນ email ເພື່ອໃຫ້ permission/RLS ຖືກຕ້ອງ</small>
+          <select id="eMAtt" multiple style="display:none"></select>
+          <div id="eMAttPicker" class="participant-picker"></div>
+          <div id="eMAttSummary" class="participant-summary">ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ</div>
         </div>
       <div class="form-row"><label>Agenda / ໝາຍເຫດ</label><textarea id="eMNote" placeholder="ຫົວຂໍ້ທີ່ຈະລົມ..."></textarea></div>
       <div class="btn-row">
@@ -1528,6 +1545,42 @@ async function populateParticipantSelect(selectId, selected = []) {
     selectedEmails.add(myEmail());
   }
   sel.innerHTML = opts.map(o => `<option value="${h(o.email)}" ${selectedEmails.has(o.email) ? 'selected' : ''}>${h(o.label)}</option>`).join('');
+  renderParticipantPicker(selectId);
+}
+
+function renderParticipantPicker(selectId) {
+  const sel = document.getElementById(selectId);
+  const picker = document.getElementById(selectId + 'Picker');
+  const summary = document.getElementById(selectId + 'Summary');
+  if (!sel || !picker) return;
+  const options = [...sel.options];
+  const selected = new Set(selectedParticipantEmails(selectId));
+  picker.innerHTML = options.map(o => {
+    const email = String(o.value || '').trim().toLowerCase();
+    const label = o.textContent || email;
+    const name = label.split('(')[0].trim() || email;
+    const checked = selected.has(email);
+    return `<button type="button" class="participant-chip ${checked ? 'selected' : ''}" onclick="toggleParticipant('${selectId}','${h(email)}')" title="${h(label)}">
+      <span class="p-avatar">${h(participantInitial(email))}</span>
+      <span class="p-main"><span class="p-name">${h(name)}</span><span class="p-email">${h(email)}</span></span>
+      <span class="p-check">${checked ? '✓' : ''}</span>
+    </button>`;
+  }).join('');
+  if (summary) {
+    summary.textContent = selected.size
+      ? `ເລືອກແລ້ວ ${selected.size} ຄົນ: ${[...selected].map(participantLabel).join(', ')}`
+      : 'ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ';
+  }
+}
+
+function toggleParticipant(selectId, email) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const target = String(email || '').trim().toLowerCase();
+  [...sel.options].forEach(o => {
+    if (String(o.value || '').trim().toLowerCase() === target) o.selected = !o.selected;
+  });
+  renderParticipantPicker(selectId);
 }
 
 function participantLabel(email) {
