@@ -1115,6 +1115,16 @@ function myEmailKey() {
 
 // Query/RLS Sync helper: owner/created_by must be stored as full email.
 // This keeps new data aligned with Supabase RLS policies.
+
+// ════ PRODUCTION MODE SETTINGS (v15) ════
+const APP_DEBUG = false;
+function debugLog(...args) { if (APP_DEBUG) console.log(...args); }
+function debugError(...args) { if (APP_DEBUG) console.error(...args); }
+function userSafeErrorMessage(error, fallback = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້') {
+  if (APP_DEBUG) return errorMessage(error) || fallback;
+  return fallback;
+}
+
 function normalizeUserRef(value, fallbackEmail = myEmail()) {
   const v = String(value || '').trim().toLowerCase();
   const fallback = String(fallbackEmail || '').trim().toLowerCase();
@@ -1140,7 +1150,7 @@ function requireEmailRef(value, fallbackEmail = myEmail(), fieldLabel = 'user') 
   const normalized = normalizeUserRef(value, fallbackEmail);
   const email = String(normalized || '').trim().toLowerCase();
   if (!email || email === '—' || !email.includes('@')) {
-    console.error('Invalid user reference for save:', { fieldLabel, value, normalized, fallbackEmail });
+    debugError('Invalid user reference for save:', { fieldLabel, value, normalized, fallbackEmail });
     toast(`⚠️ ${fieldLabel} ຕ້ອງເປັນ email ເຊັ່ນ pou@bd.com`);
     return null;
   }
@@ -1189,10 +1199,10 @@ async function loadUserProfile() {
     }
 
     applyPermissionUI();
-    console.log('Profile loaded:', currentProfile.email, currentRole);
+    debugLog('Profile loaded:', currentProfile.email, currentRole);
     return currentProfile;
   } catch (err) {
-    console.error('loadUserProfile failed:', err);
+    debugError('loadUserProfile failed:', err);
     toast('⚠️ ໂຫຼດ Profile/Role ບໍ່ສຳເລັດ');
     return null;
   }
@@ -1255,7 +1265,7 @@ function applyPermissionUI() {
     }
   });
 
-  console.log('Permission UI Applied:', role);
+  debugLog('Permission UI Applied:', role);
 }
 
 function canWrite()   { return !hasRole('viewer'); }
@@ -1829,7 +1839,7 @@ async function checkSession() {
       if (event === 'SIGNED_OUT') showLogin();
     });
   } catch (err) {
-    console.error('checkSession failed:', err);
+    debugError('checkSession failed:', err);
     showErr('❌ ເຊື່ອມຕໍ່ Supabase ບໍ່ສຳເລັດ: ' + (err.message || err));
     $('loginPage').style.display = 'block';
   }
@@ -1918,7 +1928,7 @@ async function loadUserOptions(forceRefresh=false) {
   if (cachedUserOptions && !forceRefresh) return cachedUserOptions;
   const { data, error } = await db.from('profiles').select('id, email, full_name, role').order('email');
   if (error) {
-    console.error('loadUserOptions failed:', error);
+    debugError('loadUserOptions failed:', error);
     cachedUserOptions = [];
     return cachedUserOptions;
   }
@@ -1974,7 +1984,7 @@ function toast(msg) {
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
 
-// ════ ERROR / DEBUG HELPERS (v5) ════
+// ════ ERROR / PRODUCTION HELPERS (v15) ════
 function errorMessage(error) {
   if (!error) return '';
   return error.message || error.details || error.hint || String(error);
@@ -1983,12 +1993,11 @@ function errorMessage(error) {
 function showInlineError(targetId, title, error) {
   const el = document.getElementById(targetId);
   if (!el) return;
-  const msg = errorMessage(error) || 'Unknown error';
+  const msg = userSafeErrorMessage(error);
   el.innerHTML = `
     <div class="error-box">
-      <strong>❌ ${h(title || 'Load error')}</strong><br>
+      <strong>⚠️ ${h(title || 'ຂໍ້ມູນບໍ່ພ້ອມ')}</strong><br>
       ${h(msg)}
-      <div class="debug-small">Target: <code>${h(targetId)}</code> · Role: <code>${h(currentProfile?.role || '-')}</code> · User: <code>${h(currentProfile?.email || '-')}</code></div>
     </div>`;
 }
 
@@ -1998,17 +2007,17 @@ function showMultiError(targetIds, title, error) {
 
 function logDbError(context, error) {
   if (!error) return;
-  console.error(`[DB ERROR] ${context}`, error);
-  toast('❌ ' + (errorMessage(error) || context));
+  debugError(`[DB ERROR] ${context}`, error);
+  toast('⚠️ ບໍ່ສາມາດດຳເນີນການໄດ້');
 }
 
 window.addEventListener('unhandledrejection', ev => {
-  console.error('[Unhandled Promise]', ev.reason);
-  toast('❌ ມີ error ໃນລະບົບ — ເບິ່ງ Console');
+  debugError('[Unhandled Promise]', ev.reason);
+  if (APP_DEBUG) toast('❌ ມີ error ໃນລະບົບ — ເບິ່ງ Console');
 });
 
 window.addEventListener('error', ev => {
-  console.error('[JS ERROR]', ev.error || ev.message);
+  debugError('[JS ERROR]', ev.error || ev.message);
 });
 
 // ── Colours ──
