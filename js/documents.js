@@ -81,9 +81,12 @@ function renderDocs() {
             ${h(d.name)} ${statusBadge[docStatus]||statusBadge.inprogress}
           </div>
           <div class="doc-sub">ສ້າງໂດຍ ${d.created_by} → ${d.sent_to}</div>
+          ${workflowBadge(d)}
           <div class="flow-steps">${stepsHtml}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <button onclick="openDocHistory(${d.id})" style="border:1px solid var(--border);background:var(--bg2);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--muted)"><i class="ti ti-history"></i> History</button>
+            ${!isDone && !isCancelled && canActOnDoc(d) ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="openWorkflowRoute(${d.id})">📨 ສົ່ງຕໍ່</button>` : ''}
+            ${!isDone && !isCancelled && canActOnDoc(d) ? `<button class="btn-outline" style="font-size:11px;padding:4px 10px" onclick="signCurrentDocStep(${d.id},'signed')">✍️ ເຊັນ</button>` : ''}
             ${!isDone && !isCancelled && isSuperior()
               ? `<button class="btn-outline" data-manager-only style="font-size:11px;padding:4px 10px" onclick="advanceDoc(${d.id},${d.current_step},${steps.length})">${isFinalStep?'✅ ປິດສຳເລັດ':'➡️ ຜ່ານຂັ້ນຕໍ່ໄປ'}</button>` : ''}
             ${!isCancelled && canAdmin() && d.current_step > 0
@@ -100,6 +103,111 @@ function renderDocs() {
         </div>
       </div>`;
     }).join('');
+}
+
+
+// ════ WORKFLOW AUTOMATION v23: approval, routing, signatures, forwarding ════
+function docWorkflowMeta(doc) {
+  const sc = doc?.step_comments || {};
+  const wf = sc._workflow || {};
+  return {
+    assigned_to: (wf.assigned_to || doc?.created_by || '').toLowerCase(),
+    assigned_by: wf.assigned_by || '',
+    assigned_at: wf.assigned_at || '',
+    status: wf.status || doc?.doc_status || 'inprogress',
+    signature_log: Array.isArray(wf.signature_log) ? wf.signature_log : [],
+    routing_history: Array.isArray(wf.routing_history) ? wf.routing_history : []
+  };
+}
+
+function canActOnDoc(doc) {
+  const wf = docWorkflowMeta(doc);
+  return isSuperior() || matchesMe(doc?.created_by) || matchesMe(wf.assigned_to);
+}
+
+function workflowUserLabel(email) {
+  const e = String(email || '').toLowerCase();
+  return participantLabel ? participantLabel(e) : e;
+}
+
+async function updateDocWorkflowMeta(docId, updater, logDetail = '') {
+  const doc = allDocs.find(d => d.id === docId);
+  if (!doc) return false;
+  const sc = doc.step_comments || {};
+  const oldWf = docWorkflowMeta(doc);
+  const newWf = updater({...oldWf}) || oldWf;
+  sc._workflow = newWf;
+  const { error } = await db.from('documents').update({ step_comments: sc }).eq('id', docId);
+  if (error) { toast('❌ ' + error.message); return false; }
+  if (logDetail) await logAction('updated','document', docId, doc?.name || '', logDetail);
+  return true;
+}
+
+function workflowBadge(doc) {
+  const wf = docWorkflowMeta(doc);
+  const assigned = wf.assigned_to ? workflowUserLabel(wf.assigned_to) : '—';
+  const sigs = wf.signature_log?.length || 0;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+    <span class="badge normal" title="ຜູ້ຮັບຜິດຊອບຂັ້ນປັດຈຸບັນ">👤 ${h(assigned)}</span>
+    <span class="badge done-b" title="Signature log">✍️ ${sigs} ລາຍເຊັນ</span>
+  </div>`;
+}
+
+function openWorkflowRoute(docId) {
+  const doc = allDocs.find(d => d.id === docId);
+  if (!doc) return;
+  if (!canActOnDoc(doc)) return toast('⛔ ບໍ່ມີສິດສົ່ງຕໍ່ເອກະສານນີ້');
+  const modal = document.getElementById('workflowRouteModal');
+  if (!modal) return toast('⚠️ Workflow modal missing');
+  document.getElementById('wfDocId').value = docId;
+  document.getElementById('wfDocTitle').textContent = doc.name || '';
+  document.getElementById('wfNote').value = '';
+  populateUserSelect('wfRouteUser', docWorkflowMeta(doc).assigned_to || myEmail(), false);
+  modal.style.display = 'flex';
+}
+
+function closeWorkflowRoute() {
+  const modal = document.getElementById('workflowRouteModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveWorkflowRoute() {
+  const docId = parseInt(document.getElementById('wfDocId').value);
+  const to = requireEmailRef(document.getElementById('wfRouteUser').value, '', 'ຜູ້ຮັບຕໍ່');
+  if (!to) return;
+  const note = document.getElementById('wfNote').value.trim();
+  const ok = await updateDocWorkflowMeta(docId, wf => {
+    wf.routing_history = wf.routing_history || [];
+    wf.routing_history.push({
+      from: myEmail(), to, note,
+      at: new Date().toISOString(),
+      step: (allDocs.find(d=>d.id===docId)?.current_step || 0)
+    });
+    wf.assigned_to = to;
+    wf.assigned_by = myEmail();
+    wf.assigned_at = new Date().toISOString();
+    wf.status = 'forwarded';
+    return wf;
+  }, `forwarded → ${to}${note ? ' | '+note : ''}`);
+  if (ok) { toast('📨 ສົ່ງຕໍ່ແລ້ວ'); closeWorkflowRoute(); await loadDocs(); }
+}
+
+async function signCurrentDocStep(docId, action = 'signed') {
+  const doc = allDocs.find(d => d.id === docId);
+  if (!doc) return;
+  if (!canActOnDoc(doc)) return toast('⛔ ບໍ່ມີສິດເຊັນ/ອະນຸມັດຂັ້ນນີ້');
+  const stepIdx = doc.current_step || 0;
+  const stepName = (doc.steps || [])[stepIdx] || '';
+  const ok = await updateDocWorkflowMeta(docId, wf => {
+    wf.signature_log = wf.signature_log || [];
+    const already = wf.signature_log.some(s => s.by === myEmail() && s.step === stepIdx && s.action === action);
+    if (!already) wf.signature_log.push({
+      by: myEmail(), action, step: stepIdx, step_name: stepName, at: new Date().toISOString()
+    });
+    wf.status = action;
+    return wf;
+  }, `${action} step ${stepIdx+1}: ${stepName}`);
+  if (ok) { toast('✍️ ບັນທຶກລາຍເຊັນແລ້ວ'); await loadDocs(); }
 }
 
 
@@ -177,7 +285,11 @@ function openDocHistory(docId) {
     </div>`;
   });
 
-  document.getElementById('dhTimeline').innerHTML = html;
+  
+  const wf = docWorkflowMeta(d);
+  const sigHtml = (wf.signature_log||[]).length ? `<div style="margin-top:14px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg2)"><div style="font-size:12px;font-weight:600;margin-bottom:6px">✍️ Signature log</div>${wf.signature_log.map(s=>`<div style="font-size:11px;color:var(--muted);margin:3px 0">${h(s.by)} · ${h(s.action)} · ${h(s.step_name||('Step '+((s.step||0)+1)))} · ${new Date(s.at).toLocaleString('lo-LA')}</div>`).join('')}</div>` : '';
+  const routeHtml = (wf.routing_history||[]).length ? `<div style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg2)"><div style="font-size:12px;font-weight:600;margin-bottom:6px">📨 Routing / Forwarding</div>${wf.routing_history.map(r=>`<div style="font-size:11px;color:var(--muted);margin:3px 0">${h(r.from)} → ${h(r.to)} ${r.note ? ' · '+h(r.note) : ''} · ${new Date(r.at).toLocaleString('lo-LA')}</div>`).join('')}</div>` : '';
+  document.getElementById('dhTimeline').innerHTML = html + sigHtml + routeHtml;
   document.getElementById('docHistoryModal').style.display = 'flex';
 
   // ໃສ່ revert button ໃນ modal footer ຖ້າ admin + cur > 0
@@ -237,33 +349,52 @@ async function saveStepComment() {
 async function advanceDoc(id, cur, total) {
   const doc = allDocs.find(d=>d.id===id);
   if (!doc) return;
+  if (!canActOnDoc(doc)) return toast('⛔ ບໍ່ມີສິດອະນຸມັດ/ຜ່ານຂັ້ນນີ້');
 
   const lastIndex = Math.max((total || 1) - 1, 0);
+  const stepIdx = cur || 0;
+  const stepName = (doc.steps || [])[stepIdx] || '';
+  await updateDocWorkflowMeta(id, wf => {
+    wf.signature_log = wf.signature_log || [];
+    wf.signature_log.push({
+      by: myEmail(),
+      action: cur >= lastIndex ? 'completed' : 'approved',
+      step: stepIdx,
+      step_name: stepName,
+      at: new Date().toISOString()
+    });
+    wf.status = cur >= lastIndex ? 'done' : 'approved';
+    return wf;
+  });
 
-  // ຖ້າຢູ່ຂັ້ນສຸດທ້າຍແລ້ວ ໃຫ້ກົດອີກຄັ້ງເພື່ອປິດສຳເລັດ
-  // ບໍ່ໃຫ້ current_step ສຸດທ້າຍຖືກນັບເປັນ done ອັດຕະໂນມັດ.
   if (cur >= lastIndex) {
     const { error } = await db.from('documents')
       .update({ current_step: lastIndex, doc_status: 'done' })
       .eq('id', id);
     if (error) { toast('❌ ' + error.message); return; }
-    await logAction('updated','document', id, doc?.name||'', 'doc_status → done');
-    toast('✅ ປິດເອກະສານສຳເລັດ!');
+    await logAction('approved','document', id, doc?.name||'', 'final approval / completed');
+    toast('✅ ອະນຸມັດປິດເອກະສານສຳເລັດ!');
     loadDocs();
     return;
   }
 
   const nextStepIndex = cur + 1;
+  const nextStep = (doc?.steps||[])[nextStepIndex]||'';
   const { error } = await db.from('documents')
     .update({ current_step: nextStepIndex, doc_status: 'inprogress' })
     .eq('id', id);
   if (error) { toast('❌ ' + error.message); return; }
 
-  const nextStep = (doc?.steps||[])[nextStepIndex]||'';
-  await logAction('updated','document', id, doc?.name||'', `ຜ່ານຂັ້ນ → ${nextStep}`);
-  toast(nextStepIndex >= lastIndex ? '📄 ເຖິງຂັ້ນສຸດທ້າຍແລ້ວ — ກົດປິດສຳເລັດເມື່ອສຳເລັດຈິງ' : '📄 ເລື່ອນຂັ້ນຕໍ່ໄປ!');
+  await updateDocWorkflowMeta(id, wf => {
+    wf.assigned_to = wf.assigned_to || doc.created_by || myEmail();
+    wf.status = 'inprogress';
+    return wf;
+  });
+  await logAction('approved','document', id, doc?.name||'', `approved → ${nextStep}`);
+  toast(nextStepIndex >= lastIndex ? '📄 ເຖິງຂັ້ນສຸດທ້າຍແລ້ວ — ກົດປິດສຳເລັດເມື່ອສຳເລັດຈິງ' : '✅ ອະນຸມັດ ແລະ ຜ່ານຂັ້ນແລ້ວ');
   loadDocs();
 }
+
 
 async function revertDoc(id, cur) {
   if (cur <= 0) { toast('⚠️ ຢູ່ຂັ້ນທຳອິດແລ້ວ'); return; }
@@ -374,7 +505,8 @@ async function saveDoc() {
     name:n, doc_type:tp, created_by,
     sent_to: document.getElementById('dTo').value||'—',
     steps, current_step:0, doc_status:'inprogress',
-    doc_number, doc_direction
+    doc_number, doc_direction,
+    step_comments: {_workflow:{assigned_to: created_by, assigned_by: myEmail(), assigned_at: new Date().toISOString(), status:'inprogress', signature_log:[], routing_history:[]}}
   });
   if(error){toast('❌ '+error.message);return;}
   await logAction('created','document', 0, n,

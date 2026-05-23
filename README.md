@@ -1,48 +1,20 @@
-# Department Dashboard Refactor v21
+# Department Dashboard v23 — Workflow Automation
 
-This version separates the previous single `js/app.js` file into feature modules.
+Adds document workflow automation on top of v22:
 
-## Structure
+- Approval flow: approving a document step records a signature entry.
+- Routing / forwarding: assign the current document step to another user.
+- Signature log: records who signed/approved which step and when.
+- Workflow history: stores forwarding events in `documents.step_comments._workflow`.
 
-```text
-index.html
-css/
-  style.css
-js/
-  config.js
-  core.js
-  activity.js
-  comments.js
-  ui.js
-  participants.js
-  admin.js
-  auth.js
-  profile.js
-  dashboard.js
-  tasks.js
-  documents.js
-  meetings.js
-  leave.js
-  reports.js
-  main.js
-```
+## Database requirement
+No new table is required. Workflow metadata is stored in the existing `documents.step_comments` JSONB column.
 
-## Important
+## Upload to GitHub
+Upload all files/folders to repo root:
 
-- Keep all files/folders at the repository root.
-- `index.html` loads modules in order using normal script tags.
-- `main.js` runs `initApp()` last.
-- Supabase config remains in `js/config.js`.
+- `index.html`
+- `css/`
+- `js/`
+- `README.md`
 
-## Next recommended split
-
-If the app grows further, split `core.js` into `permissions.js`, `helpers.js`, and `state.js`.
-
-
-## v22 Notification System
-- Toast notification แบบ production
-- Notification bell + unread badge
-- Overdue task alerts
-- Meeting reminders today/tomorrow
-- Pending document reminders
-- Read state saved in localStorage per user

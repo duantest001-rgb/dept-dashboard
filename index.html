@@ -743,6 +743,29 @@
 <div id="reportProgress"></div>
 </div>
 </div>
+
+<!-- ── WORKFLOW ROUTE MODAL v23 ── -->
+<div id="workflowRouteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--bg);border-radius:var(--radius-lg);padding:22px;width:min(440px,92vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
+    <button onclick="closeWorkflowRoute()" style="position:absolute;top:12px;right:12px;border:none;background:transparent;cursor:pointer;font-size:18px;color:var(--muted)">✕</button>
+    <div style="font-size:15px;font-weight:700;margin-bottom:4px">📨 ສົ່ງຕໍ່ / Routing ເອກະສານ</div>
+    <div id="wfDocTitle" style="font-size:12px;color:var(--muted);margin-bottom:14px;padding:6px 10px;background:var(--bg2);border-radius:8px"></div>
+    <input id="wfDocId" type="hidden"/>
+    <div class="form-row">
+      <label>ສົ່ງຕໍ່ຫາ</label>
+      <select id="wfRouteUser" style="font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;width:100%"></select>
+    </div>
+    <div class="form-row">
+      <label>ໝາຍເຫດ</label>
+      <textarea id="wfNote" placeholder="ເຫດຜົນ / ຄຳແນະນຳ..." style="height:70px"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="saveWorkflowRoute()">📨 ສົ່ງຕໍ່</button>
+      <button class="btn-outline" onclick="closeWorkflowRoute()">ຍົກເລີກ</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── PROFILE MODAL ── -->
 <div id="profileModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999;align-items:center;justify-content:center">
 <div style="background:var(--bg);border-radius:var(--radius-lg);padding:24px;width:min(380px,90vw);box-shadow:0 8px 32px rgba(0,0,0,.18);position:relative">
