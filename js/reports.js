@@ -1,148 +1,152 @@
+function _analyticsDateOnly(value){
+  if(!value) return null;
+  const d = new Date(value);
+  if(Number.isNaN(d.getTime())) return null;
+  d.setHours(0,0,0,0);
+  return d;
+}
+function _daysBetween(a,b){ return Math.ceil((a-b)/(1000*60*60*24)); }
+function _docSteps(doc){
+  if(Array.isArray(doc.steps)) return doc.steps;
+  if(typeof doc.steps === 'string'){
+    try { const p=JSON.parse(doc.steps); if(Array.isArray(p)) return p; } catch(e) {}
+    return doc.steps.split(',').map(x=>x.trim()).filter(Boolean);
+  }
+  return [];
+}
+function _docStatus(doc){ return doc.doc_status || doc.status || 'inprogress'; }
+function _isDocPending(doc){ return !['done','cancelled'].includes(_docStatus(doc)); }
+function _ownerLabel(email){ return (email||'—').replace('@bd.com',''); }
+function _setHtml(id, html){ const el=document.getElementById(id); if(el) el.innerHTML=html; }
+function _analyticsEmpty(text){ return `<div class="empty">${text}</div>`; }
+function _bar(label, value, max, color){
+  const height = Math.max((value/(max||1))*110, value>0?8:4);
+  return `<div class="analytics-mini-bar"><div class="analytics-mini-val">${value}</div><div class="analytics-mini-fill" style="height:${height}px;background:${color}"></div><div class="analytics-mini-label">${h(label)}</div></div>`;
+}
+
 async function loadReport() {
-  let t = [], d = [];
+  let tasks = [], docs = [], profiles = [];
   try {
-    const [tRes, dRes] = await Promise.all([
-      db.from('tasks').select('*').order('created_at'),
-      db.from('documents').select('*'),
+    const [tRes, dRes, pRes] = await Promise.all([
+      db.from('tasks').select('*').order('created_at', { ascending:false }),
+      db.from('documents').select('*').order('created_at', { ascending:false }),
+      db.from('profiles').select('email,role,full_name').order('email')
     ]);
     if (tRes.error) throw tRes.error;
     if (dRes.error) throw dRes.error;
-    t = tRes.data||[];
-    d = dRes.data||[];
+    if (pRes.error) throw pRes.error;
+    tasks = tRes.data || [];
+    docs = dRes.data || [];
+    profiles = pRes.data || [];
   } catch (error) {
-    logDbError('loadReport', error);
-    showMultiError(['kpiOverdue','kpiPendingDocs','kpiCompletion','statusChart','reportSummary'], 'ໂຫຼດລາຍງານບໍ່ສຳເລັດ', error);
+    logDbError('loadReport.analytics', error);
+    ['analyticsKpiCards','analyticsOverdueTasks','analyticsStaffWorkload','analyticsApprovalBottleneck','analyticsDepartmentProductivity','analyticsTaskStatus','analyticsDocumentStatus']
+      .forEach(id => _setHtml(id, `<div class="empty">ໂຫຼດ Analytics ບໍ່ສຳເລັດ</div>`));
     return;
   }
 
-  // ── Base counts ──────────────────────────────────
-  const done = t.filter(x=>x.status==='done').length;
-  const inp  = t.filter(x=>x.status==='inprogress').length;
-  const blk  = t.filter(x=>x.status==='blocked').length;
-  const pct  = t.length ? Math.round(done/t.length*100) : 0;
-
   const today = new Date(); today.setHours(0,0,0,0);
+  const doneTasks = tasks.filter(x=>x.status==='done');
+  const activeTasks = tasks.filter(x=>x.status!=='done');
+  const blockedTasks = tasks.filter(x=>x.status==='blocked');
+  const inProgressTasks = tasks.filter(x=>x.status==='inprogress');
+  const overdueTasks = activeTasks.filter(x => {
+    const due = _analyticsDateOnly(x.due_date);
+    return due && due < today;
+  }).sort((a,b)=>new Date(a.due_date)-new Date(b.due_date));
 
-  // ── Overdue tasks ─────────────────────────────────
-  const overdue = t.filter(x => {
-    if (x.status==='done' || !x.due_date || x.due_date==='—') return false;
-    return new Date(x.due_date) < today;
+  const pendingDocs = docs.filter(_isDocPending);
+  const doneDocs = docs.filter(x=>_docStatus(x)==='done');
+  const cancelledDocs = docs.filter(x=>_docStatus(x)==='cancelled');
+
+  // Approval bottleneck: group pending documents by current workflow step
+  const stepMap = {};
+  pendingDocs.forEach(doc => {
+    const steps = _docSteps(doc);
+    const idx = Number(doc.current_step || 0);
+    const step = steps[idx] || 'ບໍ່ລະບຸຂັ້ນຕອນ';
+    if(!stepMap[step]) stepMap[step] = { count:0, docs:[] };
+    stepMap[step].count++;
+    stepMap[step].docs.push(doc);
   });
+  const bottlenecks = Object.entries(stepMap).sort((a,b)=>b[1].count-a[1].count);
 
-  // ── Pending docs ──────────────────────────────────
-  const pendingDocs = d.filter(x => isDocInProgress(x));
-  const approvedDocs = d.length - pendingDocs.length;
-
-  // ── Weekly completed (last 4 weeks) ───────────────
-  const weeks = [0,1,2,3].map(w => {
-    const wStart = new Date(today); wStart.setDate(wStart.getDate() - (w+1)*7);
-    const wEnd   = new Date(today); wEnd.setDate(wEnd.getDate() - w*7);
-    const label  = `${wStart.getDate()}/${wStart.getMonth()+1}`;
-    const count  = t.filter(x => {
-      if (x.status !== 'done') return false;
-      const d = new Date(x.updated_at || x.created_at);
-      return d >= wStart && d < wEnd;
-    }).length;
-    return {label, count};
-  }).reverse();
-
-  // ── Workload per person ───────────────────────────
-  const workMap = {};
-  t.filter(x=>x.status!=='done').forEach(x => {
-    const o = x.owner||'—';
-    if (!workMap[o]) workMap[o] = {total:0, blocked:0, urgent:0};
-    workMap[o].total++;
-    if (x.status==='blocked') workMap[o].blocked++;
-    if (x.priority==='urgent') workMap[o].urgent++;
+  // Staff workload and productivity
+  const staffMap = {};
+  profiles.forEach(p => { staffMap[p.email] = { email:p.email, name:p.full_name || _ownerLabel(p.email), role:p.role, total:0, active:0, done:0, overdue:0, blocked:0, urgent:0, progressSum:0 }; });
+  tasks.forEach(t => {
+    const email = t.owner || 'unassigned';
+    if(!staffMap[email]) staffMap[email] = { email, name:_ownerLabel(email), role:'', total:0, active:0, done:0, overdue:0, blocked:0, urgent:0, progressSum:0 };
+    const s = staffMap[email];
+    s.total++;
+    s.progressSum += Number(t.progress || 0);
+    if(t.status==='done') s.done++; else s.active++;
+    if(t.status==='blocked') s.blocked++;
+    if(t.priority==='urgent') s.urgent++;
+    if(overdueTasks.some(o=>o.id===t.id)) s.overdue++;
   });
-  const workload = Object.entries(workMap)
-    .sort((a,b)=>b[1].total-a[1].total).slice(0,5);
+  const staff = Object.values(staffMap).filter(s=>s.total>0).sort((a,b)=>b.active-a.active || b.overdue-a.overdue);
+  const completionRate = tasks.length ? Math.round(doneTasks.length/tasks.length*100) : 0;
+  const docDoneRate = docs.length ? Math.round(doneDocs.length/docs.length*100) : 0;
+  const avgProgress = tasks.length ? Math.round(tasks.reduce((sum,t)=>sum+Number(t.progress||0),0)/tasks.length) : 0;
 
-  // ── KPI Cards ─────────────────────────────────────
-  document.getElementById('kpiCards').innerHTML = `
-    <div class="metric"><div class="num" style="color:var(--c1)">${pct}%</div><div class="lbl">ຄວາມຄືບໜ້າ</div></div>
-    <div class="metric"><div class="num" style="color:var(--c1)">${done}</div><div class="lbl">ສຳເລັດ</div></div>
-    <div class="metric"><div class="num" style="color:var(--c3)">${inp}</div><div class="lbl">ດຳເນີນຢູ່</div></div>
-    <div class="metric"><div class="num" style="color:var(--c4)">${blk}</div><div class="lbl">ຕິດຂັດ</div></div>
-    <div class="metric"><div class="num" style="color:var(--c4)">${overdue.length}</div><div class="lbl">ຊ້າ Deadline</div></div>
-    <div class="metric"><div class="num" style="color:var(--c3)">${pendingDocs.length}</div><div class="lbl">ເອກະສານຄ້າງ</div></div>`;
+  _setHtml('analyticsKpiCards', `
+    <div class="analytics-kpi"><div class="kpi-label">Overdue Tasks</div><div class="kpi-num" style="color:var(--c4)">${overdueTasks.length}</div><div class="kpi-note">ວຽກທີ່ເກີນ deadline</div></div>
+    <div class="analytics-kpi"><div class="kpi-label">Productivity</div><div class="kpi-num" style="color:var(--c1)">${completionRate}%</div><div class="kpi-note">ອັດຕາວຽກສຳເລັດ</div></div>
+    <div class="analytics-kpi"><div class="kpi-label">Approval Bottleneck</div><div class="kpi-num" style="color:var(--c3)">${pendingDocs.length}</div><div class="kpi-note">ເອກະສານຍັງຄ້າງ workflow</div></div>
+    <div class="analytics-kpi"><div class="kpi-label">Staff Workload</div><div class="kpi-num" style="color:var(--c2)">${activeTasks.length}</div><div class="kpi-note">ວຽກ active ທັງໝົດ</div></div>
+  `);
 
-  // ── Overdue list ──────────────────────────────────
-  document.getElementById('kpiOverdue').innerHTML = overdue.length === 0
-    ? '<div class="empty">✅ ບໍ່ມີວຽກຊ້າ</div>'
-    : overdue.map(x => {
-        const days = Math.ceil((today - new Date(x.due_date)) / (1000*60*60*24));
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
-            <div style="font-size:11px;color:var(--muted)">${h(x.owner)} · Due: ${x.due_date}</div>
-          </div>
-          <span style="background:var(--c4l);color:var(--c4m);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;white-space:nowrap">ຊ້າ ${days} ວັນ</span>
-        </div>`;
-      }).join('');
+  _setHtml('analyticsOverdueTasks', overdueTasks.length ? overdueTasks.slice(0,8).map(t=>{
+    const days = _daysBetween(today, _analyticsDateOnly(t.due_date));
+    return `<div class="analytics-row">
+      <div class="analytics-row-main"><div class="analytics-row-title">${h(t.name)}</div><div class="analytics-row-sub">${h(_ownerLabel(t.owner))} · Due ${h(t.due_date)} · ${h(t.status||'')}</div></div>
+      <span class="analytics-badge danger">ຊ້າ ${days} ວັນ</span>
+    </div>`;
+  }).join('') : _analyticsEmpty('✅ ບໍ່ມີວຽກຊ້າ deadline'));
 
-  // ── Pending docs list ─────────────────────────────
-  document.getElementById('kpiPendingDocs').innerHTML = pendingDocs.length === 0
-    ? '<div class="empty">✅ ບໍ່ມີເອກະສານຄ້າງ</div>'
-    : pendingDocs.map(x => {
-        const step = (x.steps||[])[x.current_step]||'—';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-          <span style="font-size:18px">${x.doc_type}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
-            <div style="font-size:11px;color:var(--muted)">ລໍຖ້າ: ${step}</div>
-          </div>
-        </div>`;
-      }).join('');
+  const maxActive = Math.max(...staff.map(s=>s.active), 1);
+  _setHtml('analyticsStaffWorkload', staff.length ? staff.slice(0,8).map(s=>{
+    const pct = Math.round((s.active/maxActive)*100);
+    return `<div class="analytics-row">
+      <div class="analytics-row-main"><div class="analytics-row-title">${h(s.name)} <span style="font-size:11px;color:var(--muted);font-weight:600">${h(s.email)}</span></div>
+      <div class="analytics-row-sub">Active ${s.active} · Done ${s.done} · Blocked ${s.blocked} · Urgent ${s.urgent}</div>
+      <div class="analytics-progress"><span style="width:${pct}%"></span></div></div>
+      <span class="analytics-badge ${s.overdue?'danger':'good'}">${s.overdue} overdue</span>
+    </div>`;
+  }).join('') : _analyticsEmpty('ບໍ່ມີວຽກທີ່ມີ owner'));
 
-  // ── Workload chart ────────────────────────────────
-  const maxW = Math.max(...workload.map(w=>w[1].total), 1);
-  document.getElementById('kpiWorkload').innerHTML = workload.length === 0
-    ? '<div class="empty">ບໍ່ມີຂໍ້ມູນ</div>'
-    : workload.map(([name, stat], i) => {
-        const pct2 = Math.round(stat.total/maxW*100);
-        const medal = i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : '';
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-          <div style="min-width:28px;font-size:14px;text-align:center">${medal||`${i+1}.`}</div>
-          <div style="min-width:90px;font-size:13px;color:var(--text);font-weight:${i===0?'600':'400'}">${h(name)}</div>
-          <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-            <div style="height:100%;width:${pct2}%;background:${i===0?'var(--c4)':'var(--c2)'};border-radius:4px;transition:width .4s"></div>
-          </div>
-          <div style="font-size:12px;min-width:60px;text-align:right;color:var(--muted)">
-            ${stat.total} ວຽກ${stat.blocked>0?` · <span style="color:var(--c4m)">⛔${stat.blocked}</span>`:''}${stat.urgent>0?` · <span style="color:var(--c3m)">🔴${stat.urgent}</span>`:''}
-          </div>
-        </div>`;
-      }).join('');
+  _setHtml('analyticsApprovalBottleneck', bottlenecks.length ? bottlenecks.slice(0,8).map(([step, stat], i)=>{
+    const firstDocs = stat.docs.slice(0,2).map(d=>h(d.name)).join(' · ');
+    return `<div class="analytics-row">
+      <div style="width:28px;font-size:16px">${i===0?'🔥':'⏳'}</div>
+      <div class="analytics-row-main"><div class="analytics-row-title">${h(step)}</div><div class="analytics-row-sub">${firstDocs || '—'}</div></div>
+      <span class="analytics-badge warn">${stat.count} docs</span>
+    </div>`;
+  }).join('') : _analyticsEmpty('✅ ບໍ່ມີ approval bottleneck'));
 
-  // ── Weekly bar chart ──────────────────────────────
-  const maxWk = Math.max(...weeks.map(w=>w.count), 1);
-  document.getElementById('kpiWeeklyChart').innerHTML = weeks.map(w => `
-    <div class="bar-col">
-      <div class="bar-val">${w.count}</div>
-      <div class="bar-fill" style="height:${Math.max(w.count/maxWk*80,4)}px;background:var(--c1)"></div>
-      <div class="bar-lbl">${w.label}</div>
-    </div>`).join('');
+  const topProductive = [...staff].sort((a,b)=>b.done-a.done || b.total-a.total).slice(0,6);
+  _setHtml('analyticsDepartmentProductivity', topProductive.length ? topProductive.map(s=>{
+    const rate = s.total ? Math.round(s.done/s.total*100) : 0;
+    return `<div class="analytics-row">
+      <div class="analytics-row-main"><div class="analytics-row-title">${h(s.name)}</div><div class="analytics-row-sub">Completion ${rate}% · Avg progress ${s.total?Math.round(s.progressSum/s.total):0}%</div>
+      <div class="analytics-progress"><span style="width:${rate}%;background:linear-gradient(90deg,var(--c1),#16a34a)"></span></div></div>
+      <span class="analytics-badge good">${s.done}/${s.total}</span>
+    </div>`;
+  }).join('') : _analyticsEmpty('ບໍ່ມີຂໍ້ມູນ productivity'));
 
-  // ── Task status bar chart ─────────────────────────
-  const mx = Math.max(done,inp,blk,1);
-  document.getElementById('taskBarChart').innerHTML = [
-    {l:'ສຳເລັດ',v:done,c:'var(--c1)'},{l:'ດຳເນີນ',v:inp,c:'var(--c2)'},{l:'ຕິດຂັດ',v:blk,c:'var(--c4)'}
-  ].map(b=>`<div class="bar-col"><div class="bar-val">${b.v}</div><div class="bar-fill" style="height:${Math.max(b.v/mx*70,4)}px;background:${b.c}"></div><div class="bar-lbl">${b.l}</div></div>`).join('');
+  const taskMax = Math.max(doneTasks.length, inProgressTasks.length, blockedTasks.length, overdueTasks.length, 1);
+  _setHtml('analyticsTaskStatus', [
+    _bar('Done', doneTasks.length, taskMax, 'linear-gradient(180deg,var(--c1),#16a34a)'),
+    _bar('In progress', inProgressTasks.length, taskMax, 'linear-gradient(180deg,var(--c2),#2563eb)'),
+    _bar('Blocked', blockedTasks.length, taskMax, 'linear-gradient(180deg,var(--c4),#dc2626)'),
+    _bar('Overdue', overdueTasks.length, taskMax, 'linear-gradient(180deg,#f97316,#b45309)')
+  ].join(''));
 
-  // ── Doc bar chart ─────────────────────────────────
-  const mx2 = Math.max(approvedDocs, pendingDocs.length, 1);
-  document.getElementById('docBarChart').innerHTML = [
-    {l:'ອະນຸມັດ',v:approvedDocs,c:'var(--c1)'},{l:'ລໍຖ້າ',v:pendingDocs.length,c:'var(--c3)'}
-  ].map(b=>`<div class="bar-col"><div class="bar-val">${b.v}</div><div class="bar-fill" style="height:${Math.max(b.v/mx2*70,4)}px;background:${b.c}"></div><div class="bar-lbl">${b.l}</div></div>`).join('');
-
-  // ── Progress timeline ─────────────────────────────
-  document.getElementById('reportProgress').innerHTML = t.map(x=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <div style="width:130px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.name)}</div>
-      <div style="width:70px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h(x.owner)}</div>
-      <div style="flex:1;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
-        <div style="height:100%;width:${x.progress}%;background:${x.status==='blocked'?'var(--c4)':x.status==='done'?'var(--c1)':'var(--c2)'};border-radius:4px"></div>
-      </div>
-      <span style="font-size:12px;font-weight:600;min-width:32px;text-align:right;color:var(--muted)">${x.progress}%</span>
-    </div>`).join('');
+  const docMax = Math.max(doneDocs.length, pendingDocs.length, cancelledDocs.length, 1);
+  _setHtml('analyticsDocumentStatus', [
+    _bar('Done', doneDocs.length, docMax, 'linear-gradient(180deg,var(--c1),#16a34a)'),
+    _bar('Pending', pendingDocs.length, docMax, 'linear-gradient(180deg,var(--c3),#d97706)'),
+    _bar('Cancelled', cancelledDocs.length, docMax, 'linear-gradient(180deg,var(--c4),#dc2626)')
+  ].join(''));
 }

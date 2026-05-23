@@ -18,3 +18,11 @@ Upload all files/folders to repo root:
 - `js/`
 - `README.md`
 
+
+
+## v24 Analytics Dashboard
+- Overdue tasks
+- Department productivity
+- Approval bottleneck
+- Staff workload
+- Task/document status analytics

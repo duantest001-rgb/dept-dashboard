@@ -701,47 +701,49 @@
 </div>
 <!-- ── REPORT ── -->
 <div class="page" id="page-report">
-<!-- KPI Cards Row -->
-<div id="kpiCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1rem">
-<div class="spinner">ໂຫຼດ...</div>
-</div>
-<!-- KPI Highlight Row -->
-<div class="row2" style="margin-bottom:1rem">
-<div class="card">
-<div class="card-title"><i class="ti ti-flame" style="color:var(--c4)"></i> ວຽກຊ້າ Deadline</div>
-<div id="kpiOverdue"><div class="spinner">ໂຫຼດ...</div></div>
-</div>
-<div class="card">
-<div class="card-title"><i class="ti ti-file-time" style="color:var(--c3)"></i> ເອກະສານຄ້າງ</div>
-<div id="kpiPendingDocs"><div class="spinner">ໂຫຼດ...</div></div>
-</div>
-</div>
-<!-- Workload per person -->
-<div class="card" style="margin-bottom:1rem">
-<div class="card-title"><i class="ti ti-users" style="color:var(--c2)"></i> ວຽກຕໍ່ຄົນ (Top 5)</div>
-<div id="kpiWorkload"></div>
-</div>
-<!-- Weekly completed -->
-<div class="card" style="margin-bottom:1rem">
-<div class="card-title"><i class="ti ti-calendar-stats" style="color:var(--c1)"></i> ວຽກສຳເລັດ 4 ອາທິດຫຼ້າສຸດ</div>
-<div class="bar-chart" id="kpiWeeklyChart" style="height:100px;align-items:flex-end"></div>
-</div>
-<!-- Task status + Doc charts -->
-<div class="row2" style="margin-bottom:1rem">
-<div class="card">
-<div class="card-title"><i class="ti ti-chart-bar" style="color:var(--c1)"></i> ສະຖານະວຽກ</div>
-<div class="bar-chart" id="taskBarChart"></div>
-</div>
-<div class="card">
-<div class="card-title"><i class="ti ti-files" style="color:var(--c2)"></i> ເອກະສານ</div>
-<div class="bar-chart" id="docBarChart"></div>
-</div>
-</div>
-<!-- Progress timeline -->
-<div class="card">
-<div class="card-title"><i class="ti ti-list-check" style="color:var(--c3)"></i> Progress ວຽກທັງໝົດ</div>
-<div id="reportProgress"></div>
-</div>
+  <div class="analytics-hero">
+    <div>
+      <div class="analytics-kicker">Analytics Dashboard</div>
+      <h2>ວິເຄາະຜົນງານພະແນກ</h2>
+      <p>Overdue tasks · Department productivity · Approval bottleneck · Staff workload</p>
+    </div>
+    <button class="btn-outline" onclick="loadReport()"><i class="ti ti-refresh"></i> Refresh</button>
+  </div>
+
+  <div id="analyticsKpiCards" class="analytics-kpis"><div class="spinner">ໂຫຼດ...</div></div>
+
+  <div class="analytics-grid analytics-grid-2">
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-alert-triangle" style="color:var(--c4)"></i> Overdue Tasks</div>
+      <div id="analyticsOverdueTasks"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-users" style="color:var(--c2)"></i> Staff Workload</div>
+      <div id="analyticsStaffWorkload"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+  </div>
+
+  <div class="analytics-grid analytics-grid-2">
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-route" style="color:var(--c3)"></i> Approval Bottleneck</div>
+      <div id="analyticsApprovalBottleneck"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-chart-arcs" style="color:var(--c1)"></i> Department Productivity</div>
+      <div id="analyticsDepartmentProductivity"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+  </div>
+
+  <div class="analytics-grid analytics-grid-2">
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-chart-bar" style="color:var(--c1)"></i> Task Status</div>
+      <div id="analyticsTaskStatus" class="analytics-mini-chart"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+    <div class="card analytics-card">
+      <div class="card-title"><i class="ti ti-file-analytics" style="color:var(--c5)"></i> Document Status</div>
+      <div id="analyticsDocumentStatus" class="analytics-mini-chart"><div class="spinner">ໂຫຼດ...</div></div>
+    </div>
+  </div>
 </div>
 
 <!-- ── WORKFLOW ROUTE MODAL v23 ── -->
