@@ -38,17 +38,43 @@ document.addEventListener('click', e => {
 });
 
 function initApp() {
+  const warn = $('config-warn');
+  const login = $('loginPage');
+  const main = $('mainApp');
+
   const badConfig = !SUPABASE_URL || !SUPABASE_KEY ||
     SUPABASE_URL.includes('YOUR_PROJECT') || SUPABASE_KEY.includes('YOUR_ANON') ||
     !SUPABASE_URL.startsWith('https://') || SUPABASE_KEY.length < 20;
-  if (badConfig) {
-    $('config-warn').style.display = 'block';
-    $('loginPage').style.display = 'none';
-    $('mainApp').style.display = 'none';
+
+  if (!createClient) {
+    if (warn) {
+      warn.style.display = 'block';
+      const strong = warn.querySelector('strong');
+      if (strong) strong.textContent = 'Supabase library ໂຫຼດບໍ່ສຳເລັດ';
+      const div = warn.querySelector('.config-banner div');
+      if (div) div.insertAdjacentHTML('beforeend', '<br><small>ກວດ internet/CDN ຫຼື ໃຊ້ local supabase-js file ແທນ CDN.</small>');
+    }
+    if (login) login.style.display = 'none';
+    if (main) main.style.display = 'none';
     return;
   }
-  db = createClient(SUPABASE_URL, SUPABASE_KEY);
-  checkSession();
+
+  if (badConfig) {
+    if (warn) warn.style.display = 'block';
+    if (login) login.style.display = 'none';
+    if (main) main.style.display = 'none';
+    return;
+  }
+
+  try {
+    db = createClient(SUPABASE_URL, SUPABASE_KEY);
+    checkSession();
+  } catch (err) {
+    console.error('Supabase init failed:', err);
+    if (warn) warn.style.display = 'block';
+    if (login) login.style.display = 'none';
+    if (main) main.style.display = 'none';
+  }
 }
 
 async function checkSession() {

@@ -97,9 +97,15 @@ function exportXLSX() {
 // Store participants as email array, not Lao names or comma text.
 
 function showPage(p, btn) {
+  const page = document.getElementById('page-' + p);
+  if (!page) {
+    console.warn('Page not found:', p);
+    toast('⚠️ ບໍ່ພົບໜ້າ: ' + p);
+    return;
+  }
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-'+p).classList.add('active');
+  page.classList.add('active');
   if(btn) btn.classList.add('active');
   const map = {dash:loadDash, profile:loadProfileDashboard, tasks:loadTasks, docs:loadDocs, meet:loadMeet, leave:loadLeave, report:loadReport, log:loadLog, admin:loadAdmin};
   if(map[p]) map[p]();
@@ -163,7 +169,9 @@ function toggleForm(id) {
 }
 
 function toast(msg) {
+  if (window.showToast) return window.showToast(msg);
   const t=document.getElementById('toast');
+  if (!t) { console.log(msg); return; }
   t.textContent=msg; t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2500);
 }
