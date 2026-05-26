@@ -36,12 +36,32 @@ function normalizeRole(role) {
   return ['admin', 'manager', 'employee', 'viewer'].includes(r) ? r : 'viewer';
 }
 
+function readStoredRole() {
+  try {
+    const p = JSON.parse(localStorage.getItem('currentProfile') || 'null');
+    return normalizeRole(p?.role);
+  } catch (e) {
+    return 'viewer';
+  }
+}
+
+function getEffectiveRole() {
+  const role = normalizeRole(currentRole);
+  if (role !== 'viewer') return role;
+
+  const storedRole = readStoredRole();
+  if (storedRole !== 'viewer') return storedRole;
+
+  const domRole = document.getElementById('userEmail')?.dataset?.role;
+  return normalizeRole(domRole);
+}
+
 function formatRoleLabel(role) {
   return ROLE_LABELS[normalizeRole(role)] || 'Viewer';
 }
 
 function hasRole(...roles) {
-  return roles.includes(normalizeRole(currentRole));
+  return roles.includes(getEffectiveRole());
 }
 
 function myEmail() {
@@ -160,9 +180,9 @@ function setVisible(el, visible, fallbackDisplay = '') {
 }
 
 function applyPermissionUI() {
-  const role = normalizeRole(currentRole);
+  const role = getEffectiveRole();
   const isViewer = role === 'viewer';
-  const superior = hasRole('admin', 'manager');
+  const superior = role === 'admin' || role === 'manager';
 
   setVisible($('adminNavBtn'), role === 'admin', 'inline-flex');
   setVisible($('addAnnBtn'), superior, 'inline-flex');
@@ -184,9 +204,9 @@ function applyPermissionUI() {
   debugLog('Permission UI Applied:', role);
 }
 
-function canWrite() { return !hasRole('viewer'); }
-function canAdmin() { return normalizeRole(currentRole) === 'admin'; }
-function isSuperior() { return hasRole('admin', 'manager'); }
+function canWrite() { return getEffectiveRole() !== 'viewer'; }
+function canAdmin() { return getEffectiveRole() === 'admin'; }
+function isSuperior() { const r = getEffectiveRole(); return r === 'admin' || r === 'manager'; }
 function canManageMeetings() { return isSuperior(); }
 function canManageLeaveBalance() { return isSuperior(); }
 function canEditTask(task) { return isSuperior() || matchesMe(task?.owner); }
@@ -194,7 +214,7 @@ function canDeleteTask() { return isSuperior(); }
 function canCommentTask(task) { return isSuperior() || matchesMe(task?.owner); }
 function canEditDoc(doc) { return isSuperior() || matchesMe(doc?.created_by); }
 function canDeleteDoc() { return isSuperior(); }
-function canManageAnn() { return hasRole('admin', 'manager'); }
+function canManageAnn() { return isSuperior(); }
 function canAckComment(comment) { return isSuperior() || (currentUser && comment.user_id !== currentUser.id); }
 function canEdit() { return isSuperior(); }
 function canDelete() { return isSuperior(); }
