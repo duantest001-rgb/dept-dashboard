@@ -82,6 +82,11 @@ async function showApp(email) {
 
   $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   await Promise.allSettled([loadUserOptions(true), loadDash()]);
+
+  // Start global realtime sync + fallback refresh after login/session restore
+  if (typeof startRealtimeSync === 'function') startRealtimeSync();
+  if (typeof startAutoRefreshFallback === 'function') startAutoRefreshFallback();
+
   if (typeof refreshNotifications === 'function') refreshNotifications({ silent: true });
 }
 
