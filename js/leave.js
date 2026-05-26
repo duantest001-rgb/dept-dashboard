@@ -402,12 +402,10 @@ async function saveBalance() {
   toast('✅ ບັນທຶກວັນລາສຳເລັດ!');
   closeBalanceModal();
   loadLeave();
-}
-// ===== LEAVE APPROVAL ACCOUNTING PATCH =====
-// pending = ບໍ່ຫັກວັນ
-// approved = ຫັກວັນລາ
-// rejected = ບໍ່ຫັກວັນ
-// cancelled = ຄືນວັນລາ
+}// ===== LEAVE APPROVAL ACCOUNTING PATCH v2 =====
+// Rule:
+// Employee = ສ້າງໃບລາ / ແກ້ pending ຂອງຕົນເອງໄດ້
+// Admin/Manager = ອະນຸມັດ / ປະຕິເສດ / ຍົກເລີກຄືນວັນ / ລຶບ ໄດ້
 
 function leaveDaysSafe(l) {
   return Number(
@@ -436,7 +434,9 @@ async function syncLeaveBalance(owner, deltaDays) {
       .update({ used_days: newUsed })
       .eq('owner', owner);
 
-    if (!error) current.used_days = newUsed;
+    if (!error) {
+      current.used_days = newUsed;
+    }
 
     return { error };
   }
@@ -475,6 +475,12 @@ approveLeave = async function(id) {
     return toast('⚠️ ໃບລານີ້ອະນຸມັດແລ້ວ');
   }
 
+  if (l.status === 'cancelled') {
+    return toast('⚠️ ໃບລານີ້ຖືກຍົກເລີກແລ້ວ');
+  }
+
+  const days = leaveDaysSafe(l);
+
   const { error } = await db
     .from('leaves')
     .update({ status: 'approved' })
@@ -485,7 +491,7 @@ approveLeave = async function(id) {
     return;
   }
 
-  const bal = await syncLeaveBalance(l.owner, leaveDaysSafe(l));
+  const bal = await syncLeaveBalance(l.owner, days);
 
   if (bal.error) {
     toast('⚠️ ອະນຸມັດແລ້ວ ແຕ່ຫັກວັນລາບໍ່ສຳເລັດ: ' + bal.error.message);
@@ -498,21 +504,21 @@ approveLeave = async function(id) {
     'leave',
     id,
     l.owner || '',
-    `${l.date_from} → ${l.date_to} · -${leaveDaysSafe(l)} ວັນ`
+    `${l.date_from} → ${l.date_to} · -${days} ວັນ`
   );
 
   loadLeave();
 };
 
 async function cancelLeave(id) {
+  if (!isSuperior()) {
+    return toast('⛔ ສະເພາະ Admin/Manager ເທົ່ານັ້ນທີ່ຍົກເລີກ ແລະ ຄືນວັນລາໄດ້');
+  }
+
   const l = allLeaves.find(x => x.id === id);
 
   if (!l) {
     return toast('⚠️ ບໍ່ພົບໃບລາ');
-  }
-
-  if (!(isSuperior() || matchesMe(l.owner))) {
-    return toast('⛔ ບໍ່ມີສິດຍົກເລີກໃບລານີ້');
   }
 
   if (l.status !== 'approved') {
@@ -522,6 +528,8 @@ async function cancelLeave(id) {
   if (!confirm('ຢືນຢັນຍົກເລີກໃບລາ ແລະ ຄືນວັນລາ?')) {
     return;
   }
+
+  const days = leaveDaysSafe(l);
 
   const { error } = await db
     .from('leaves')
@@ -533,7 +541,7 @@ async function cancelLeave(id) {
     return;
   }
 
-  const bal = await syncLeaveBalance(l.owner, -leaveDaysSafe(l));
+  const bal = await syncLeaveBalance(l.owner, -days);
 
   if (bal.error) {
     toast('⚠️ ຍົກເລີກແລ້ວ ແຕ່ຄືນວັນລາບໍ່ສຳເລັດ: ' + bal.error.message);
@@ -546,7 +554,7 @@ async function cancelLeave(id) {
     'leave',
     id,
     l.owner || '',
-    `cancelled · +${leaveDaysSafe(l)} ວັນ`
+    `cancelled · +${days} ວັນ`
   );
 
   loadLeave();
@@ -562,6 +570,7 @@ deleteLeave = async function(id) {
   }
 
   const l = allLeaves.find(x => x.id === id);
+  const days = leaveDaysSafe(l);
 
   const { error } = await db
     .from('leaves')
@@ -574,7 +583,7 @@ deleteLeave = async function(id) {
   }
 
   if (l?.status === 'approved') {
-    await syncLeaveBalance(l.owner, -leaveDaysSafe(l));
+    await syncLeaveBalance(l.owner, -days);
   }
 
   await logAction(
@@ -583,7 +592,7 @@ deleteLeave = async function(id) {
     id,
     l?.owner || '',
     l?.status === 'approved'
-      ? `deleted · +${leaveDaysSafe(l)} ວັນ`
+      ? `deleted · +${days} ວັນ`
       : ''
   );
 
@@ -591,21 +600,12 @@ deleteLeave = async function(id) {
   loadLeave();
 };
 
-// ໃຫ້ balance ຄິດຈາກ approved leaves ເປັນຫຼັກ
+// Balance display: ໃຊ້ used_days ຈາກ leave_balance ເປັນຫຼັກ
 renderLeaveBalance = function() {
   const el = document.getElementById('leaveBalanceArea');
   if (!el) return;
 
   const visibleBalances = getVisibleLeaveBalance();
-  const visibleLeaves = getVisibleLeaves();
-
-  const usedByOwner = {};
-
-  visibleLeaves.forEach(l => {
-    if (l.status === 'approved' || getLeaveDisplayStatus(l) === 'active') {
-      usedByOwner[l.owner] = (usedByOwner[l.owner] || 0) + leaveDaysSafe(l);
-    }
-  });
 
   if (!visibleBalances.length) {
     el.innerHTML = '<div class="empty" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນວັນລາ</div>';
@@ -615,8 +615,8 @@ renderLeaveBalance = function() {
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
       ${visibleBalances.map(b => {
-        const used = usedByOwner[b.owner] ?? b.used_days ?? 0;
-        const total = b.total_days ?? 15;
+        const used = Number(b.used_days || 0);
+        const total = Number(b.total_days || 15);
         const remain = Math.max(0, total - used);
         const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
         const color = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
@@ -644,11 +644,15 @@ renderLeaveBalance = function() {
   `;
 };
 
-// ເພີ່ມປຸ່ມຍົກເລີກ/ຄືນວັນ ໃຫ້ໃບລາທີ່ approved
-const __baseRenderLeave = renderLeave;
+// ເພີ່ມປຸ່ມຍົກເລີກ/ຄືນວັນ ສະເພາະ Admin/Manager
+const __baseRenderLeaveV2 = renderLeave;
 
-renderLeave = function patchedRenderLeave() {
-  __baseRenderLeave();
+renderLeave = function patchedRenderLeaveV2() {
+  __baseRenderLeaveV2();
+
+  if (!isSuperior()) {
+    return;
+  }
 
   const list = document.getElementById('leaveList');
   if (!list) return;
@@ -658,7 +662,6 @@ renderLeave = function patchedRenderLeave() {
 
   visible.forEach((l, idx) => {
     if (l.status !== 'approved') return;
-    if (!(isSuperior() || matchesMe(l.owner))) return;
 
     const row = rows[idx];
     const btnArea = row?.querySelector('div[style*="flex-wrap"]');
@@ -678,4 +681,3 @@ renderLeave = function patchedRenderLeave() {
     );
   });
 };
-// ════ REPORT ════
