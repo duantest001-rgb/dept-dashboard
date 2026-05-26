@@ -38,33 +38,28 @@ async function loadProfileDashboard() {
     $('profileEmail').textContent = email;
     $('profileRoleChip').innerHTML = `<i class="ti ti-shield"></i> ${h(formatRoleLabel(currentRole))}`;
 
+    // ດຶງສະເພາະ records ຂອງ user ນີ້ — ກັນດຶງ ALL rows ມາ filter client-side
     const [tasksRes, docsRes, meetsRes, leavesRes, balRes, logRes] = await Promise.all([
-      db.from('tasks').select('*').order('created_at', { ascending:false }),
-      db.from('documents').select('*').order('created_at', { ascending:false }),
-      db.from('meetings').select('*').order('meet_date', { ascending:true }),
-      db.from('leaves').select('*').order('date_from', { ascending:false }),
+      db.from('tasks').select('*').eq('owner', email).order('created_at', { ascending:false }),
+      db.from('documents').select('*').eq('created_by', email).order('created_at', { ascending:false }),
+      db.from('meetings').select('*').order('meet_date', { ascending:true })
+        .or(`created_by.eq.${email},attendees.cs.["${email}"]`),
+      db.from('leaves').select('*').eq('owner', email).order('date_from', { ascending:false }),
       db.from('leave_balance').select('*').eq('owner', email).maybeSingle(),
-      db.from('activity_log').select('*').order('created_at', { ascending:false }).limit(200)
+      db.from('activity_log').select('*').eq('user_email', email)
+        .order('created_at', { ascending:false }).limit(8)
     ]);
 
     const firstErr = tasksRes.error || docsRes.error || meetsRes.error || leavesRes.error || balRes.error || logRes.error;
     if (firstErr) throw firstErr;
 
-    const myTasks = (tasksRes.data || []).filter(t => matchesMe(t.owner));
-    const myDocs  = (docsRes.data || []).filter(d => matchesMe(d.created_by));
-    const myLeaves= (leavesRes.data || []).filter(l => matchesMe(l.owner));
-    const myMeets = (meetsRes.data || []).filter(m => {
-      const attendees = normalizeParticipants(m.attendees || []);
-      return attendees.includes(email) || matchesMe(m.created_by);
-    });
-    const balance = balRes.data || null;
+    const myTasks  = tasksRes.data  || [];
+    const myDocs   = docsRes.data   || [];
+    const myLeaves = leavesRes.data || [];
+    const myMeets  = meetsRes.data  || [];
+    const balance  = balRes.data    || null;
     const remainingLeave = calcLeaveRemaining(balance);
-    const myLogs = (logRes.data || []).filter(l => {
-      const logEmail = String(l.user_email || '').toLowerCase().trim();
-      const logUserId = String(l.user_id || '').trim();
-      const profileId = String(currentProfile?.id || '').trim();
-      return logEmail === email.toLowerCase() || (profileId && logUserId === profileId);
-    }).slice(0, 8);
+    const myLogs   = logRes.data    || [];
 
     const openTasks = myTasks.filter(t => t.status !== 'done').length;
     const urgentTasks = myTasks.filter(t => t.priority === 'urgent' && t.status !== 'done').length;
