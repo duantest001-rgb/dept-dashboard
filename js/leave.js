@@ -403,5 +403,279 @@ async function saveBalance() {
   closeBalanceModal();
   loadLeave();
 }
+// ===== LEAVE APPROVAL ACCOUNTING PATCH =====
+// pending = ບໍ່ຫັກວັນ
+// approved = ຫັກວັນລາ
+// rejected = ບໍ່ຫັກວັນ
+// cancelled = ຄືນວັນລາ
 
+function leaveDaysSafe(l) {
+  return Number(
+    l?.days_count ??
+    (Math.round((new Date(l.date_to) - new Date(l.date_from)) / 86400000) + 1)
+  ) || 0;
+}
+
+async function syncLeaveBalance(owner, deltaDays) {
+  owner = normalizeUserRef(owner, myEmail());
+  const delta = Number(deltaDays || 0);
+
+  if (!owner || owner === '—' || !delta) {
+    return { error: null };
+  }
+
+  const current = (allLeaveBalance || []).find(
+    b => String(b.owner || '').toLowerCase() === owner
+  );
+
+  if (current) {
+    const newUsed = Math.max(0, Number(current.used_days || 0) + delta);
+
+    const { error } = await db
+      .from('leave_balance')
+      .update({ used_days: newUsed })
+      .eq('owner', owner);
+
+    if (!error) current.used_days = newUsed;
+
+    return { error };
+  }
+
+  const { error } = await db
+    .from('leave_balance')
+    .insert({
+      owner,
+      total_days: 15,
+      used_days: Math.max(0, delta)
+    });
+
+  if (!error) {
+    allLeaveBalance.push({
+      owner,
+      total_days: 15,
+      used_days: Math.max(0, delta)
+    });
+  }
+
+  return { error };
+}
+
+approveLeave = async function(id) {
+  if (!isSuperior()) {
+    return toast('⛔ ສະເພາະ Admin/Manager ອະນຸມັດໄດ້');
+  }
+
+  const l = allLeaves.find(x => x.id === id);
+
+  if (!l) {
+    return toast('⚠️ ບໍ່ພົບໃບລາ');
+  }
+
+  if (l.status === 'approved') {
+    return toast('⚠️ ໃບລານີ້ອະນຸມັດແລ້ວ');
+  }
+
+  const { error } = await db
+    .from('leaves')
+    .update({ status: 'approved' })
+    .eq('id', id);
+
+  if (error) {
+    toast('❌ ' + error.message);
+    return;
+  }
+
+  const bal = await syncLeaveBalance(l.owner, leaveDaysSafe(l));
+
+  if (bal.error) {
+    toast('⚠️ ອະນຸມັດແລ້ວ ແຕ່ຫັກວັນລາບໍ່ສຳເລັດ: ' + bal.error.message);
+  } else {
+    toast('✅ ອະນຸມັດ ແລະ ຫັກວັນລາແລ້ວ');
+  }
+
+  await logAction(
+    'approved',
+    'leave',
+    id,
+    l.owner || '',
+    `${l.date_from} → ${l.date_to} · -${leaveDaysSafe(l)} ວັນ`
+  );
+
+  loadLeave();
+};
+
+async function cancelLeave(id) {
+  const l = allLeaves.find(x => x.id === id);
+
+  if (!l) {
+    return toast('⚠️ ບໍ່ພົບໃບລາ');
+  }
+
+  if (!(isSuperior() || matchesMe(l.owner))) {
+    return toast('⛔ ບໍ່ມີສິດຍົກເລີກໃບລານີ້');
+  }
+
+  if (l.status !== 'approved') {
+    return toast('⚠️ ຍົກເລີກໄດ້ສະເພາະໃບລາທີ່ອະນຸມັດແລ້ວ');
+  }
+
+  if (!confirm('ຢືນຢັນຍົກເລີກໃບລາ ແລະ ຄືນວັນລາ?')) {
+    return;
+  }
+
+  const { error } = await db
+    .from('leaves')
+    .update({ status: 'cancelled' })
+    .eq('id', id);
+
+  if (error) {
+    toast('❌ ' + error.message);
+    return;
+  }
+
+  const bal = await syncLeaveBalance(l.owner, -leaveDaysSafe(l));
+
+  if (bal.error) {
+    toast('⚠️ ຍົກເລີກແລ້ວ ແຕ່ຄືນວັນລາບໍ່ສຳເລັດ: ' + bal.error.message);
+  } else {
+    toast('✅ ຍົກເລີກ ແລະ ຄືນວັນລາແລ້ວ');
+  }
+
+  await logAction(
+    'updated',
+    'leave',
+    id,
+    l.owner || '',
+    `cancelled · +${leaveDaysSafe(l)} ວັນ`
+  );
+
+  loadLeave();
+}
+
+deleteLeave = async function(id) {
+  if (!isSuperior()) {
+    return toast('⛔ ສະເພາະ Admin/Manager ລຶບໄດ້');
+  }
+
+  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) {
+    return;
+  }
+
+  const l = allLeaves.find(x => x.id === id);
+
+  const { error } = await db
+    .from('leaves')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    toast('❌ ' + error.message);
+    return;
+  }
+
+  if (l?.status === 'approved') {
+    await syncLeaveBalance(l.owner, -leaveDaysSafe(l));
+  }
+
+  await logAction(
+    'deleted',
+    'leave',
+    id,
+    l?.owner || '',
+    l?.status === 'approved'
+      ? `deleted · +${leaveDaysSafe(l)} ວັນ`
+      : ''
+  );
+
+  toast('🗑️ ລຶບສຳເລັດ');
+  loadLeave();
+};
+
+// ໃຫ້ balance ຄິດຈາກ approved leaves ເປັນຫຼັກ
+renderLeaveBalance = function() {
+  const el = document.getElementById('leaveBalanceArea');
+  if (!el) return;
+
+  const visibleBalances = getVisibleLeaveBalance();
+  const visibleLeaves = getVisibleLeaves();
+
+  const usedByOwner = {};
+
+  visibleLeaves.forEach(l => {
+    if (l.status === 'approved' || getLeaveDisplayStatus(l) === 'active') {
+      usedByOwner[l.owner] = (usedByOwner[l.owner] || 0) + leaveDaysSafe(l);
+    }
+  });
+
+  if (!visibleBalances.length) {
+    el.innerHTML = '<div class="empty" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນວັນລາ</div>';
+    return;
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+      ${visibleBalances.map(b => {
+        const used = usedByOwner[b.owner] ?? b.used_days ?? 0;
+        const total = b.total_days ?? 15;
+        const remain = Math.max(0, total - used);
+        const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+        const color = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
+        const bgColor = pct >= 90 ? '#FAECE7' : pct >= 60 ? '#FFF3CD' : '#E1F5EE';
+
+        return `
+          <div style="background:${bgColor};border-radius:var(--radius);padding:10px 12px">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">
+              👤 ${h(b.owner)}
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
+              ໃຊ້ ${h(used)} / ${h(total)} ວັນ
+            </div>
+            <div style="height:5px;background:rgba(0,0,0,.1);border-radius:3px;overflow:hidden;margin-bottom:5px">
+              <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
+            </div>
+            <div style="font-size:18px;font-weight:700;color:${color}">
+              ${h(remain)}
+              <span style="font-size:10px;font-weight:400">ວັນຍັງເຫຼືອ</span>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+};
+
+// ເພີ່ມປຸ່ມຍົກເລີກ/ຄືນວັນ ໃຫ້ໃບລາທີ່ approved
+const __baseRenderLeave = renderLeave;
+
+renderLeave = function patchedRenderLeave() {
+  __baseRenderLeave();
+
+  const list = document.getElementById('leaveList');
+  if (!list) return;
+
+  const rows = Array.from(list.children);
+  const visible = getVisibleLeaves();
+
+  visible.forEach((l, idx) => {
+    if (l.status !== 'approved') return;
+    if (!(isSuperior() || matchesMe(l.owner))) return;
+
+    const row = rows[idx];
+    const btnArea = row?.querySelector('div[style*="flex-wrap"]');
+
+    if (!btnArea || btnArea.querySelector('[data-cancel-leave-btn]')) {
+      return;
+    }
+
+    btnArea.insertAdjacentHTML(
+      'beforeend',
+      `<button
+        data-cancel-leave-btn
+        onclick="cancelLeave(${l.id})"
+        style="border:1px solid var(--border);background:#F1EFE8;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#5F5E5A">
+        <i class="ti ti-ban"></i> ຍົກເລີກ/ຄືນວັນ
+      </button>`
+    );
+  });
+};
 // ════ REPORT ════
