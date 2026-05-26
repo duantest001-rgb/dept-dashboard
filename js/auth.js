@@ -77,6 +77,9 @@ function initApp() {
   }
 }
 
+// Guard: ກັນ showApp() ຖືກ call ຊ້ຳໃນ race ລະຫວ່າງ getSession + onAuthStateChange
+let __appBooted = false;
+
 async function checkSession() {
   if (!requireDbReady()) return;
   try {
@@ -88,8 +91,15 @@ async function checkSession() {
       $('loginPage').style.display = 'block';
     }
     db.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) await showApp(session.user.email);
-      if (event === 'SIGNED_OUT') showLogin();
+      if (event === 'SIGNED_IN' && session?.user) {
+        // ຖ້າ app ໂຫຼດຈາກ getSession ໄປແລ້ວ — skip (ກັນ double call)
+        if (__appBooted) return;
+        await showApp(session.user.email);
+      }
+      if (event === 'SIGNED_OUT') {
+        __appBooted = false;
+        showLogin();
+      }
     });
   } catch (err) {
     debugError('checkSession failed:', err);
@@ -105,6 +115,8 @@ async function showApp(email) {
 
   await loadUserProfile();
   applyPermissionUI();
+
+  __appBooted = true;
 
   $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   await Promise.allSettled([loadUserOptions(true), loadDash()]);

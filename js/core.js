@@ -117,13 +117,17 @@ function matchesMe(value) {
 
 async function loadUserProfile() {
   try {
-    currentRole = 'viewer';
+    // ຢ່າ reset currentRole ກ່ອນ — ຈະເຮັດໃຫ້ UI flicker ໄປ viewer ຊ່ວງ await
+    // reset ຄ່ານ້ອຍ ໃຫ້ user/profile ເທົ່ານັ້ນ
     currentUser = null;
     currentProfile = null;
 
     const { data: { user }, error: userError } = await db.auth.getUser();
     if (userError) throw userError;
-    if (!user) return null;
+    if (!user) {
+      currentRole = 'viewer';
+      return null;
+    }
 
     currentUser = user;
 

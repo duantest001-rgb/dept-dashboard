@@ -15,7 +15,7 @@ const TABLE_REFRESH_MAP = {
   meetings: ['loadMeet', 'loadDash', 'refreshNotifications'],
   leaves: ['loadLeave', 'loadDash', 'loadReport', 'refreshNotifications'],
   leave_balance: ['loadLeave', 'loadProfileDashboard'],
-  profiles: ['loadUserOptions', 'loadAdmin', 'loadDash', 'loadProfileDashboard'],
+  profiles: ['loadUserProfile', 'loadUserOptions', 'loadAdmin', 'loadDash', 'loadProfileDashboard'],
   announcements: ['loadDash', 'refreshNotifications'],
   activity_log: ['loadLog']
 };
