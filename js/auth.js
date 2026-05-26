@@ -4,7 +4,7 @@ function openProfileModal() {
   const roleColor = {admin:'#993C1D',manager:'#185FA5',employee:'#0F6E56',viewer:'#5F5E5A'}[currentRole] || '#5F5E5A';
   const roleBg    = {admin:'#FAECE7',manager:'#E6F1FB',employee:'#E1F5EE',viewer:'#F1EFE8'}[currentRole] || '#F1EFE8';
   const initials  = (currentUser.email||'?').substring(0,2).toUpperCase();
-  document.getElementById('profileAvatar').textContent      = initials;
+  document.getElementById('profileModalAvatar').textContent  = initials;
   document.getElementById('profileEmailLabel').textContent  = currentUser.email;
   document.getElementById('profileRoleBadge').textContent   = roleName;
   document.getElementById('profileRoleBadge').style.background = roleBg;
@@ -109,6 +109,8 @@ async function showApp(email) {
   $('dateNow').textContent = new Date().toLocaleDateString('lo-LA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   await Promise.allSettled([loadUserOptions(true), loadDash()]);
   if (typeof refreshNotifications === 'function') refreshNotifications({ silent: true });
+  if (typeof startRealtimeSync === 'function') startRealtimeSync();
+  if (typeof startAutoRefreshFallback === 'function') startAutoRefreshFallback();
 }
 
 function showLogin() {

@@ -168,13 +168,7 @@ function toggleForm(id) {
   }
 }
 
-function toast(msg) {
-  if (window.showToast) return window.showToast(msg);
-  const t=document.getElementById('toast');
-  if (!t) { console.log(msg); return; }
-  t.textContent=msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2500);
-}
+// toast() is defined as window.toast in notifications.js — do not redefine here.
 
 // ════ ERROR / PRODUCTION HELPERS (v15) ════
 function errorMessage(error) {
