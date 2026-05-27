@@ -92,8 +92,9 @@ async function checkSession() {
     }
     db.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        // ຖ້າ app ໂຫຼດຈາກ getSession ໄປແລ້ວ — skip (ກັນ double call)
-        if (__appBooted) return;
+        // ຖ້າ login page ຍັງໂຊຢູ່ ຫຼື app ຍັງບໍ່ boot ໃຫ້ບັງຄັບເຂົ້າ showApp
+        const loginVisible = $('loginPage') && $('loginPage').style.display !== 'none';
+        if (__appBooted && !loginVisible) return;
         await showApp(session.user.email);
       }
       if (event === 'SIGNED_OUT') {
@@ -142,8 +143,17 @@ async function doLogin() {
   btn.disabled = true; btn.textContent = 'ກຳລັງ Login...';
   errEl.style.display = 'none';
   try {
-    const { error } = await db.auth.signInWithPassword({ email, password });
-    if (error) showErr(error.message === 'Invalid login credentials' ? '❌ Email ຫຼື Password ບໍ່ຖືກ' : '❌ ' + error.message);
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+    if (error) {
+      showErr(error.message === 'Invalid login credentials' ? '❌ Email ຫຼື Password ບໍ່ຖືກ' : '❌ ' + error.message);
+      return;
+    }
+
+    // ບັງຄັບສະຫຼັບໜ້າຈາກ Login ເຂົ້າ Dashboard ທັນທີ
+    // ແກ້ອາການ sidebar ຂຶ້ນແລ້ວ ແຕ່ກາງຈໍຍັງເປັນ Login
+    const signedEmail = data?.user?.email || email;
+    __appBooted = false;
+    await showApp(signedEmail);
   } catch (err) {
     showErr('❌ ລະບົບ Login ມີບັນຫາ: ' + (err.message || err));
   } finally {

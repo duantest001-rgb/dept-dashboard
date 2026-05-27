@@ -3,6 +3,33 @@
 // Notification System v22: toast, unread badge, reminders, overdue alerts
 // ════════════════════════════════════════════════════════════════════════
 let notificationItems = [];
+
+// Fallback helper: normalize meeting attendees safely.
+// Prevents login/dashboard crash when other files do not define normalizeAttendees.
+function normalizeAttendees(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map(x => String(x || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+  if (value === null || value === undefined) return [];
+  if (typeof value === 'object') {
+    try {
+      return Object.values(value)
+        .flat()
+        .map(x => String(x || '').trim().toLowerCase())
+        .filter(Boolean);
+    } catch (_) {
+      return [];
+    }
+  }
+  return String(value || '')
+    .split(/[;,
+|]+/)
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 let notificationReadKey = '';
 
 function getReadNotificationIds() {

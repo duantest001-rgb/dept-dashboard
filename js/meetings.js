@@ -256,29 +256,53 @@ function clearMeetSearch() {
 }
 
 async function saveMeet() {
-  if (!canManageMeetings()) return toast('⛔ ສະເພາະ Admin/Manager ເພີ່ມນັດໝາຍໄດ້');
+  // ອະນຸຍາດໃຫ້ user ທຸກຄົນທີ່ login ແລ້ວ ສ້າງນັດໝາຍຂອງໂຕເອງໄດ້
+  if (!currentUser) return toast('⛔ ກະລຸນາ login ກ່ອນ');
+
   const t = document.getElementById('mTitle').value.trim();
   if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
+
   const att = selectedParticipantEmails('mAtt');
-  if (att.length === 0) { toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ'); return; }
+  if (att.length === 0) {
+    toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ');
+    return;
+  }
+
   const tp = document.getElementById('mType').value;
-  const {error} = await db.from('meetings').insert({
-    title:t, meet_date:document.getElementById('mDate').value||null,
-    meet_time:document.getElementById('mTime').value||null,
-    location:document.getElementById('mLoc').value||'ຫ້ອງປະຊຸມ',
-    notes:document.getElementById('mNote').value, attendees:att,
-    meet_type: tp
-  });
+  const creator = (typeof myEmail === 'function' ? myEmail() : (currentUser?.email || '')).toLowerCase();
+
+  const payload = {
+    title: t,
+    meet_date: document.getElementById('mDate').value || null,
+    meet_time: document.getElementById('mTime').value || null,
+    location: document.getElementById('mLoc').value || 'ຫ້ອງປະຊຸມ',
+    notes: document.getElementById('mNote').value,
+    attendees: att,
+    meet_type: tp,
+    meet_status: 'scheduled',
+    created_by: creator
+  };
+
+  // ບັນທຶກພ້ອມ created_by ກ່ອນ. ຖ້າ database ບາງຊຸດບໍ່ມີ column created_by ຈຶ່ງ fallback ບໍ່ໃສ່ created_by.
+  let {error} = await db.from('meetings').insert(payload);
+  if (error && String(error.message || '').toLowerCase().includes('created_by')) {
+    const fallbackPayload = {...payload};
+    delete fallbackPayload.created_by;
+    const retry = await db.from('meetings').insert(fallbackPayload);
+    error = retry.error;
+  }
+
   if(error){toast('❌ '+error.message);return;}
+
   await logAction('created','meeting', 0, t,
     `[${tp}] ${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value} | participants: ${att.join(', ')}`);
+
   toast('✅ ບັນທຶກສຳເລັດ!');
   toggleForm('addMeetForm');
   ['mTitle','mLoc','mNote'].forEach(id=>document.getElementById(id).value='');
   await populateParticipantSelect('mAtt', [myEmail()]);
   loadMeet();
 }
-
 // ════ LEAVE / ABSENCE ════
 
 const leaveTypeMap = {
