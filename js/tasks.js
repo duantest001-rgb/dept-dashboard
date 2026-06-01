@@ -170,9 +170,11 @@ async function saveEditTask() {
   if(error){toast('❌ '+error.message);return;}
   await logAction('updated','task', id, document.getElementById('eName').value,
     `status: ${document.getElementById('eStatus').value}, progress: ${document.getElementById('eProgress').value}%`);
-  toast('✅ ແກ້ໄຂສຳເລັດ!');
   document.getElementById('editTaskForm').style.display='none';
-  loadTasks();
+  const pg = document.querySelector('.page.active');
+  if (pg) pg.scrollTop = 0; else window.scrollTo({ top: 0, behavior: 'smooth' });
+  await loadTasks();
+  toast('✅ ແກ້ໄຂສຳເລັດ!');
 }
 
 async function deleteTask(id) {
