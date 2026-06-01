@@ -104,25 +104,48 @@ async function saveEditMeet() {
   if (!canManageMeetings()) return toast('⛔ ສະເພາະ Admin/Manager ແກ້ນັດໝາຍໄດ້');
   const id = parseInt(document.getElementById('editMeetId').value);
   const t  = document.getElementById('eMTitle').value.trim();
-  if(!t){ toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
+  if (!t) { toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
   const att = selectedParticipantEmails('eMAtt');
   if (att.length === 0) { toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ'); return; }
-  const tp  = document.getElementById('eMType').value;
-  const {error} = await db.from('meetings').update({
-    title:t,
+
+  const mDate = document.getElementById('eMDate').value || null;
+  const mTime = document.getElementById('eMTime').value || null;
+  const tp    = document.getElementById('eMType').value;
+
+  // ── ກວດຊ້ຳ: ຊື່ + ວັນທີ + ເວລາ ດຽວກັນ ກັບ record ອື່ນ (ບໍ່ແມ່ນຕົນເອງ) ──
+  const dup = (allMeets || []).find(m =>
+    m.id !== id &&
+    m.meet_status === 'scheduled' &&
+    m.title.trim().toLowerCase() === t.toLowerCase() &&
+    (m.meet_date || '') === (mDate || '') &&
+    (m.meet_time || '') === (mTime || '')
+  );
+  if (dup) {
+    toast('⚠️ ມີນັດໝາຍຊື່ + ວັນທີ + ເວລາດຽວກັນຢູ່ແລ້ວ (ID ' + dup.id + ')');
+    return;
+  }
+
+  const { error } = await db.from('meetings').update({
+    title:     t,
     meet_type: tp,
-    meet_date: document.getElementById('eMDate').value||null,
-    meet_time: document.getElementById('eMTime').value||null,
-    location:  document.getElementById('eMLoc').value||'ຫ້ອງປະຊຸມ',
+    meet_date: mDate,
+    meet_time: mTime,
+    location:  document.getElementById('eMLoc').value || 'ຫ້ອງປະຊຸມ',
     notes:     document.getElementById('eMNote').value,
     attendees: att
-  }).eq('id',id);
-  if(error){ toast('❌ '+error.message); return; }
-  await logAction('updated','meeting', id, t,
-    `[${tp}] ${document.getElementById('eMDate').value} ${document.getElementById('eMTime').value} | ${document.getElementById('eMLoc').value} | participants: ${att.join(', ')}`);
-  toast('✅ ແກ້ໄຂສຳເລັດ!');
+  }).eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
+
+  await logAction('updated', 'meeting', id, t,
+    `[${tp}] ${mDate} ${mTime} | ${document.getElementById('eMLoc').value} | participants: ${att.join(', ')}`);
+
+  // ── ປິດຟອມ + scroll ກັບຂຶ້ນ ──
   document.getElementById('editMeetForm').style.display = 'none';
-  loadMeet();
+  const page = document.querySelector('.page.active');
+  if (page) page.scrollTop = 0; else window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  await loadMeet();
+  toast('✅ ແກ້ໄຂສຳເລັດ!');
 }
 
 async function quickConfirmMeet(id) {
@@ -256,66 +279,68 @@ function clearMeetSearch() {
 }
 
 async function saveMeet() {
-  // ອະນຸຍາດໃຫ້ user ທຸກຄົນທີ່ login ແລ້ວ ສ້າງນັດໝາຍຂອງໂຕເອງໄດ້
   if (!currentUser) return toast('⛔ ກະລຸນາ login ກ່ອນ');
 
   const t = document.getElementById('mTitle').value.trim();
-  if(!t){toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ');return;}
+  if (!t) { toast('⚠️ ໃສ່ຫົວຂໍ້ກ່ອນ'); return; }
 
   const att = selectedParticipantEmails('mAtt');
-  if (att.length === 0) {
-    toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ');
+  if (att.length === 0) { toast('⚠️ ເລືອກຜູ້ເຂົ້າຮ່ວມຢ່າງໜ້ອຍ 1 ຄົນ'); return; }
+
+  const mDate = document.getElementById('mDate').value || null;
+  const mTime = document.getElementById('mTime').value || null;
+  const tp    = document.getElementById('mType').value;
+
+  // ── ກວດຊ້ຳ: ຊື່ + ວັນທີ + ເວລາ ດຽວກັນ ແລະ ຍັງ scheduled ຢູ່ ──
+  const dup = (allMeets || []).find(m =>
+    m.meet_status === 'scheduled' &&
+    m.title.trim().toLowerCase() === t.toLowerCase() &&
+    (m.meet_date || '') === (mDate || '') &&
+    (m.meet_time || '') === (mTime || '')
+  );
+  if (dup) {
+    toast('⚠️ ມີນັດໝາຍຊື່ + ວັນທີ + ເວລາດຽວກັນຢູ່ແລ້ວ (ID ' + dup.id + ')');
     return;
   }
 
-  const tp = document.getElementById('mType').value;
   const creator = (typeof myEmail === 'function' ? myEmail() : (currentUser?.email || '')).toLowerCase();
-
   const payload = {
-    title: t,
-    meet_date: document.getElementById('mDate').value || null,
-    meet_time: document.getElementById('mTime').value || null,
-    location: document.getElementById('mLoc').value || 'ຫ້ອງປະຊຸມ',
-    notes: document.getElementById('mNote').value,
-    attendees: att,
-    meet_type: tp,
-    meet_status: 'scheduled',
+    title:      t,
+    meet_date:  mDate,
+    meet_time:  mTime,
+    location:   document.getElementById('mLoc').value || 'ຫ້ອງປະຊຸມ',
+    notes:      document.getElementById('mNote').value,
+    attendees:  att,
+    meet_type:  tp,
+    meet_status:'scheduled',
     created_by: creator
   };
 
-  // ບັນທຶກພ້ອມ created_by ກ່ອນ. ຖ້າ database ບາງຊຸດບໍ່ມີ column created_by ຈຶ່ງ fallback ບໍ່ໃສ່ created_by.
-  let {error} = await db.from('meetings').insert(payload);
+  let { error } = await db.from('meetings').insert(payload);
   if (error && String(error.message || '').toLowerCase().includes('created_by')) {
-    const fallbackPayload = {...payload};
-    delete fallbackPayload.created_by;
-    const retry = await db.from('meetings').insert(fallbackPayload);
+    const fb = { ...payload };
+    delete fb.created_by;
+    const retry = await db.from('meetings').insert(fb);
     error = retry.error;
   }
+  if (error) { toast('❌ ' + error.message); return; }
 
-  if(error){toast('❌ '+error.message);return;}
+  await logAction('created', 'meeting', 0, t,
+    `[${tp}] ${mDate} ${mTime} | ${document.getElementById('mLoc').value} | participants: ${att.join(', ')}`);
 
-  await logAction('created','meeting', 0, t,
-    `[${tp}] ${document.getElementById('mDate').value} ${document.getElementById('mTime').value} | ${document.getElementById('mLoc').value} | participants: ${att.join(', ')}`);
-
-  toast('✅ ບັນທຶກສຳເລັດ!');
-  toggleForm('addMeetForm');
-  ['mTitle','mLoc','mNote'].forEach(id=>document.getElementById(id).value='');
+  // ── ປິດຟອມ + ລ້າງ field + scroll ກັບຂຶ້ນ ──
+  const form = document.getElementById('addMeetForm');
+  form.style.display = 'none';
+  ['mTitle', 'mLoc', 'mNote'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const mDateEl = document.getElementById('mDate'); if (mDateEl) mDateEl.value = '';
+  const mTimeEl = document.getElementById('mTime'); if (mTimeEl) mTimeEl.value = '';
   await populateParticipantSelect('mAtt', [myEmail()]);
-  loadMeet();
-}
-// ════ LEAVE / ABSENCE ════
 
-const leaveTypeMap = {
-  sick:     { icon:'🤒', label:'ລາປ່ວຍ',       bg:'#FAECE7', color:'#993C1D' },
-  personal: { icon:'🏠', label:'ລາສ່ວນຕົວ',    bg:'#FFF3CD', color:'#856404' },
-  vacation: { icon:'🌴', label:'ລາພັກຮ້ອນ',    bg:'#E1F5EE', color:'#0F6E56' },
-  overtime: { icon:'⚡', label:'ຄອບລ່ວງໜ້າ',   bg:'#EEEDFE', color:'#534AB7' },
-  other:    { icon:'📝', label:'ອື່ນໆ',          bg:'#F1EFE8', color:'#5F5E5A' },
-};
-const leaveStatusMap = {
-  pending:  { label:'⏳ ລໍຖ້າ',        bg:'#FFF3CD', color:'#856404' },
-  approved: { label:'✅ ອະນຸມັດ',      bg:'#E1F5EE', color:'#0F6E56' },
-  active:   { label:'🟢 ກຳລັງລາ',     bg:'#D1FAE5', color:'#065F46' },
-  rejected: { label:'❌ ປະຕິເສດ',     bg:'#FAECE7', color:'#993C1D' },
-};
+  const page = document.querySelector('.page.active');
+  if (page) page.scrollTop = 0; else window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  await loadMeet();
+  toast('✅ ສ້າງນັດໝາຍສຳເລັດ!');
+}
+// leaveTypeMap / leaveStatusMap ຍ້າຍໄປ leave.js ແລ້ວ
 

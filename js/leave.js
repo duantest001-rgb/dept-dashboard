@@ -1,3 +1,19 @@
+// ════ LEAVE TYPE / STATUS MAPS ════
+const leaveTypeMap = {
+  sick:     { icon:'🤒', label:'ລາປ່ວຍ',      bg:'#FAECE7', color:'#993C1D' },
+  personal: { icon:'🏠', label:'ລາສ່ວນຕົວ',   bg:'#FFF3CD', color:'#856404' },
+  vacation: { icon:'🌴', label:'ລາພັກຮ້ອນ',   bg:'#E1F5EE', color:'#0F6E56' },
+  overtime: { icon:'⚡', label:'ຄອບລ່ວງໜ້າ',  bg:'#EEEDFE', color:'#534AB7' },
+  other:    { icon:'📝', label:'ອື່ນໆ',         bg:'#F1EFE8', color:'#5F5E5A' },
+};
+const leaveStatusMap = {
+  pending:   { label:'⏳ ລໍຖ້າ',     bg:'#FFF3CD', color:'#856404' },
+  approved:  { label:'✅ ອະນຸມັດ',   bg:'#E1F5EE', color:'#0F6E56' },
+  active:    { label:'🟢 ກຳລັງລາ',  bg:'#D1FAE5', color:'#065F46' },
+  rejected:  { label:'❌ ປະຕິເສດ',  bg:'#FAECE7', color:'#993C1D' },
+  cancelled: { label:'🚫 ຍົກເລີກ',  bg:'#F1EFE8', color:'#5F5E5A' },
+};
+
 function getMyLeavesScope() {
   return normalizeUserRef(myEmail(), myEmail());
 }
@@ -81,6 +97,7 @@ function renderLeaveCalStrip() {
 
   const upcoming = getVisibleLeaves().filter(l =>
     l.status !== 'rejected' &&
+    l.status !== 'cancelled' &&
     l.date_to >= todayStr &&
     l.date_from <= next30Str
   ).sort((a,b) => a.date_from.localeCompare(b.date_from));
@@ -159,6 +176,9 @@ function renderLeave() {
           ` : ''}
           ${(isSuperior() || matchesMe(l.owner)) && l.status==='pending' ? `
             <button class="btn-edit" data-write-action onclick="openEditLeave(${l.id})" style="border:1px solid var(--border);background:var(--c2l);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--c2m)"><i class="ti ti-pencil"></i> ແກ້ໄຂ</button>
+          ` : ''}
+          ${isSuperior() && l.status === 'approved' ? `
+            <button data-manager-only onclick="cancelLeave(${l.id})" style="border:1px solid var(--border);background:#F1EFE8;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#5F5E5A"><i class="ti ti-ban"></i> ຍົກເລີກ/ຄືນວັນ</button>
           ` : ''}
           ${isSuperior() ? `
             <button class="btn-delete" data-manager-only onclick="deleteLeave(${l.id})" style="border:1px solid var(--border);background:#faece7;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#993C1D"><i class="ti ti-trash"></i> ລຶບ</button>
@@ -256,15 +276,7 @@ async function saveEditLeave() {
   loadLeave();
 }
 
-async function approveLeave(id) {
-  if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ອະນຸມັດໄດ້');
-  const l = allLeaves.find(x=>x.id===id);
-  const { error } = await db.from('leaves').update({ status:'approved' }).eq('id',id);
-  if (error) { toast('❌ '+error.message); return; }
-  await logAction('approved','leave', id, l?.owner||'', `${l?.date_from}→${l?.date_to}`);
-  toast('✅ ອະນຸມັດລາພັກສຳເລັດ!');
-  loadLeave();
-}
+// approveLeave ຢູ່ດ້ານລຸ່ມ (patch version ທີ່ sync leave_balance ດ້ວຍ)
 
 async function rejectLeave(id) {
   if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ປະຕິເສດໄດ້');
@@ -276,16 +288,7 @@ async function rejectLeave(id) {
   loadLeave();
 }
 
-async function deleteLeave(id) {
-  if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ລຶບໄດ້');
-  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) return;
-  const l = allLeaves.find(x=>x.id===id);
-  const { error } = await db.from('leaves').delete().eq('id',id);
-  if (error) { toast('❌ '+error.message); return; }
-  await logAction('deleted','leave', id, l?.owner||'', '');
-  toast('🗑️ ລຶບສຳເລັດ');
-  loadLeave();
-}
+// deleteLeave ຢູ່ດ້ານລຸ່ມ (patch version ທີ່ sync leave_balance ດ້ວຍ)
 
 function calcDays(from, to, half) {
   if (!from || !to) return null;
@@ -316,15 +319,6 @@ function renderLeaveBalance() {
   const el = document.getElementById('leaveBalanceArea');
   if (!el) return;
   const visibleBalances = getVisibleLeaveBalance();
-  const visibleLeaves = getVisibleLeaves();
-
-  const usedByOwner = {};
-  visibleLeaves.forEach(l => {
-    if (l.status === 'approved' || getLeaveDisplayStatus(l) === 'active') {
-      const d = l.days_count ?? (Math.round((new Date(l.date_to)-new Date(l.date_from))/(86400000))+1);
-      usedByOwner[l.owner] = (usedByOwner[l.owner]||0) + d;
-    }
-  });
 
   if (!visibleBalances.length) {
     el.innerHTML = '<div class="empty" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນວັນລາ</div>';
@@ -333,12 +327,12 @@ function renderLeaveBalance() {
 
   el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
     ${visibleBalances.map(b => {
-      const used = b.used_days ?? usedByOwner[b.owner] ?? 0;
-      const total = b.total_days ?? 15;
+      const used   = Number(b.used_days || 0);
+      const total  = Number(b.total_days || 15);
       const remain = Math.max(0, total - used);
-      const pct = total > 0 ? Math.min(100, Math.round((used/total)*100)) : 0;
-      const color = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
-      const bgColor = pct >= 90 ? '#FAECE7' : pct >= 60 ? '#FFF3CD' : '#E1F5EE';
+      const pct    = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+      const color  = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
+      const bgColor= pct >= 90 ? '#FAECE7' : pct >= 60 ? '#FFF3CD' : '#E1F5EE';
       return `<div style="background:${bgColor};border-radius:var(--radius);padding:10px 12px">
         <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">👤 ${h(b.owner)}</div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ໃຊ້ ${h(used)} / ${h(total)} ວັນ</div>
@@ -460,55 +454,30 @@ async function syncLeaveBalance(owner, deltaDays) {
   return { error };
 }
 
-approveLeave = async function(id) {
+async function approveLeave(id) {
   if (!isSuperior()) {
     return toast('⛔ ສະເພາະ Admin/Manager ອະນຸມັດໄດ້');
   }
 
   const l = allLeaves.find(x => x.id === id);
-
-  if (!l) {
-    return toast('⚠️ ບໍ່ພົບໃບລາ');
-  }
-
-  if (l.status === 'approved') {
-    return toast('⚠️ ໃບລານີ້ອະນຸມັດແລ້ວ');
-  }
-
-  if (l.status === 'cancelled') {
-    return toast('⚠️ ໃບລານີ້ຖືກຍົກເລີກແລ້ວ');
-  }
+  if (!l) return toast('⚠️ ບໍ່ພົບໃບລາ');
+  if (l.status === 'approved')   return toast('⚠️ ໃບລານີ້ອະນຸມັດແລ້ວ');
+  if (l.status === 'cancelled')  return toast('⚠️ ໃບລານີ້ຖືກຍົກເລີກແລ້ວ');
 
   const days = leaveDaysSafe(l);
-
-  const { error } = await db
-    .from('leaves')
-    .update({ status: 'approved' })
-    .eq('id', id);
-
-  if (error) {
-    toast('❌ ' + error.message);
-    return;
-  }
+  const { error } = await db.from('leaves').update({ status: 'approved' }).eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
 
   const bal = await syncLeaveBalance(l.owner, days);
-
   if (bal.error) {
     toast('⚠️ ອະນຸມັດແລ້ວ ແຕ່ຫັກວັນລາບໍ່ສຳເລັດ: ' + bal.error.message);
   } else {
     toast('✅ ອະນຸມັດ ແລະ ຫັກວັນລາແລ້ວ');
   }
 
-  await logAction(
-    'approved',
-    'leave',
-    id,
-    l.owner || '',
-    `${l.date_from} → ${l.date_to} · -${days} ວັນ`
-  );
-
+  await logAction('approved', 'leave', id, l.owner || '', `${l.date_from} → ${l.date_to} · -${days} ວັນ`);
   loadLeave();
-};
+}
 
 async function cancelLeave(id) {
   if (!isSuperior()) {
@@ -560,124 +529,27 @@ async function cancelLeave(id) {
   loadLeave();
 }
 
-deleteLeave = async function(id) {
-  if (!isSuperior()) {
-    return toast('⛔ ສະເພາະ Admin/Manager ລຶບໄດ້');
-  }
-
-  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) {
-    return;
-  }
+async function deleteLeave(id) {
+  if (!isSuperior()) return toast('⛔ ສະເພາະ Admin/Manager ລຶບໄດ້');
+  if (!confirm('ຢືນຢັນລຶບລາຍການນີ້?')) return;
 
   const l = allLeaves.find(x => x.id === id);
   const days = leaveDaysSafe(l);
 
-  const { error } = await db
-    .from('leaves')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    toast('❌ ' + error.message);
-    return;
-  }
+  const { error } = await db.from('leaves').delete().eq('id', id);
+  if (error) { toast('❌ ' + error.message); return; }
 
   if (l?.status === 'approved') {
     await syncLeaveBalance(l.owner, -days);
   }
 
-  await logAction(
-    'deleted',
-    'leave',
-    id,
-    l?.owner || '',
-    l?.status === 'approved'
-      ? `deleted · +${days} ວັນ`
-      : ''
-  );
+  await logAction('deleted', 'leave', id, l?.owner || '',
+    l?.status === 'approved' ? `deleted · +${days} ວັນ` : '');
 
   toast('🗑️ ລຶບສຳເລັດ');
   loadLeave();
-};
+}
 
-// Balance display: ໃຊ້ used_days ຈາກ leave_balance ເປັນຫຼັກ
-renderLeaveBalance = function() {
-  const el = document.getElementById('leaveBalanceArea');
-  if (!el) return;
+// renderLeaveBalance ຢູ່ດ້ານເທິງ (function ທຳມະດາ)
 
-  const visibleBalances = getVisibleLeaveBalance();
-
-  if (!visibleBalances.length) {
-    el.innerHTML = '<div class="empty" style="font-size:12px">ຍັງບໍ່ມີຂໍ້ມູນວັນລາ</div>';
-    return;
-  }
-
-  el.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
-      ${visibleBalances.map(b => {
-        const used = Number(b.used_days || 0);
-        const total = Number(b.total_days || 15);
-        const remain = Math.max(0, total - used);
-        const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
-        const color = pct >= 90 ? '#993C1D' : pct >= 60 ? '#856404' : '#0F6E56';
-        const bgColor = pct >= 90 ? '#FAECE7' : pct >= 60 ? '#FFF3CD' : '#E1F5EE';
-
-        return `
-          <div style="background:${bgColor};border-radius:var(--radius);padding:10px 12px">
-            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">
-              👤 ${h(b.owner)}
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
-              ໃຊ້ ${h(used)} / ${h(total)} ວັນ
-            </div>
-            <div style="height:5px;background:rgba(0,0,0,.1);border-radius:3px;overflow:hidden;margin-bottom:5px">
-              <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
-            </div>
-            <div style="font-size:18px;font-weight:700;color:${color}">
-              ${h(remain)}
-              <span style="font-size:10px;font-weight:400">ວັນຍັງເຫຼືອ</span>
-            </div>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-};
-
-// ເພີ່ມປຸ່ມຍົກເລີກ/ຄືນວັນ ສະເພາະ Admin/Manager
-const __baseRenderLeaveV2 = renderLeave;
-
-renderLeave = function patchedRenderLeaveV2() {
-  __baseRenderLeaveV2();
-
-  if (!isSuperior()) {
-    return;
-  }
-
-  const list = document.getElementById('leaveList');
-  if (!list) return;
-
-  const rows = Array.from(list.children);
-  const visible = getVisibleLeaves();
-
-  visible.forEach((l, idx) => {
-    if (l.status !== 'approved') return;
-
-    const row = rows[idx];
-    const btnArea = row?.querySelector('div[style*="flex-wrap"]');
-
-    if (!btnArea || btnArea.querySelector('[data-cancel-leave-btn]')) {
-      return;
-    }
-
-    btnArea.insertAdjacentHTML(
-      'beforeend',
-      `<button
-        data-cancel-leave-btn
-        onclick="cancelLeave(${l.id})"
-        style="border:1px solid var(--border);background:#F1EFE8;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:11px;color:#5F5E5A">
-        <i class="ti ti-ban"></i> ຍົກເລີກ/ຄືນວັນ
-      </button>`
-    );
-  });
-};
+// renderLeave ຢູ່ດ້ານເທິງ — ລວມປຸ່ມ "ຍົກເລີກ/ຄືນວັນ" ໄວ້ໃນ function ດຽວແລ້ວ
